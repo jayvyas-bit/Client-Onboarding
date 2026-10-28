@@ -255,7 +255,7 @@ function AnimatedOrdinal({ value }: { value: number }) {
   const digits = String(value).split("");
   return (
     <span className="inline-flex tabular-nums">
-      <AnimatePresence mode="popLayout" initial={false}>
+      <AnimatePresence mode="popLayout">
         {digits.map((digit, i) => (
           <motion.span
             key={`${value}-${i}`}
@@ -306,7 +306,9 @@ function OptionRow({
           : "border-neutral-200 bg-white/70 hover:border-neutral-400"
       } ${disabled ? "cursor-not-allowed opacity-45" : "cursor-pointer"}`}
     >
-      <span
+      <motion.span
+        animate={{ scale: selected ? [1, 1.18, 1] : 1 }}
+        transition={{ duration: 0.34, ease: EASE }}
         className={`flex h-7 w-7 shrink-0 items-center justify-center text-xs font-medium transition-colors ${
           shape === "circle" ? "rounded-full" : "rounded-md"
         } ${
@@ -351,7 +353,7 @@ function OptionRow({
             </motion.span>
           )}
         </AnimatePresence>
-      </span>
+      </motion.span>
       <span className="text-[15px] text-neutral-800">{label}</span>
     </motion.button>
   );
@@ -872,16 +874,19 @@ export default function UnpauseIntakeForm() {
 
   const slideVariants = {
     enter: (dir: number) =>
-      shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: dir >= 0 ? 32 : -32 },
+      shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: dir >= 0 ? 64 : -64, scale: 0.97 },
     center: {
       opacity: 1,
       x: 0,
+      scale: 1,
       transition: shouldReduceMotion
         ? { duration: 0.4, ease: EASE }
-        : { duration: 0.4, ease: EASE, staggerChildren: 0.06, delayChildren: 0.08 },
+        : { duration: 0.55, ease: EASE, staggerChildren: 0.07, delayChildren: 0.1 },
     },
     exit: (dir: number) =>
-      shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: dir >= 0 ? -32 : 32 },
+      shouldReduceMotion
+        ? { opacity: 0 }
+        : { opacity: 0, x: dir >= 0 ? -64 : 64, scale: 0.97, transition: { duration: 0.3, ease: EASE } },
   };
 
   const textItemVariants = {
@@ -890,17 +895,18 @@ export default function UnpauseIntakeForm() {
   };
 
   const reviewSections = SECTIONS.map((section) => {
-    const items = section.questions.flatMap((question) =>
-      question.parts
+    const items = section.questions.flatMap((question) => {
+      const slideIndex = SLIDES.findIndex((s) => s.kind === "question" && s.question.id === question.id);
+      return question.parts
         .map((part) => {
           const key = keyFor(question.id, part.id);
           const otherVal = (answers[`${key}__other`] as string) ?? "";
           const display = formatAnswerValue(part.part, answers[key], otherVal);
           if (!display) return null;
-          return { label: part.label ?? question.prompt, display };
+          return { label: part.label ?? question.prompt, display, slideIndex };
         })
-        .filter((item): item is { label: string; display: string } => item !== null),
-    );
+        .filter((item): item is { label: string; display: string; slideIndex: number } => item !== null);
+    });
     return { section, items };
   }).filter((entry) => entry.items.length > 0);
 
@@ -1035,9 +1041,9 @@ export default function UnpauseIntakeForm() {
                           <div className="flex max-w-prose flex-col gap-4">
                             <motion.div
                               initial={{ height: 0 }}
-                              animate={{ height: 28 }}
-                              transition={{ duration: 0.4, ease: EASE }}
-                              className="w-0.5 rounded-full bg-neutral-900/30"
+                              animate={{ height: 56 }}
+                              transition={{ duration: 0.55, ease: EASE }}
+                              className="w-0.5 rounded-full bg-[#004ac7]/60"
                             />
                             <motion.p
                               variants={textItemVariants}
@@ -1161,19 +1167,39 @@ export default function UnpauseIntakeForm() {
                           <h3 className="text-xs font-semibold uppercase tracking-wide text-[#004ac7]">
                             {section.title}
                           </h3>
-                          <dl className="flex flex-col gap-2">
+                          <dl className="flex flex-col gap-1">
                             {items.map((item, j) => (
-                              <div key={j} className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
-                                <dt className="text-sm text-neutral-500 sm:w-56 sm:shrink-0">{item.label}</dt>
-                                <dd className="text-sm font-medium text-neutral-800">{item.display}</dd>
-                              </div>
+                              <motion.div
+                                key={j}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => goTo(item.slideIndex)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    goTo(item.slideIndex);
+                                  }
+                                }}
+                                whileHover={{ x: 3 }}
+                                whileTap={{ scale: 0.99 }}
+                                transition={{ type: "spring", stiffness: 500, damping: 32 }}
+                                className="group -mx-3 flex cursor-pointer flex-col gap-0.5 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-[#004ac7]/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004ac7] sm:flex-row sm:items-baseline sm:justify-between sm:gap-3"
+                              >
+                                <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
+                                  <dt className="text-sm text-neutral-500 sm:w-56 sm:shrink-0">{item.label}</dt>
+                                  <dd className="text-sm font-medium text-neutral-800">{item.display}</dd>
+                                </div>
+                                <span className="shrink-0 text-xs font-medium text-[#004ac7] opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                                  Edit →
+                                </span>
+                              </motion.div>
                             ))}
                           </dl>
                         </div>
                       ))}
                     </motion.div>
                     <motion.p variants={textItemVariants} className="text-sm text-neutral-500">
-                      You can go back to review or change any of your answers before submitting.
+                      Tap any answer above to jump back and change it before submitting.
                     </motion.p>
                     {submitError && (
                       <motion.p variants={textItemVariants} className="text-sm text-red-600" role="alert">
