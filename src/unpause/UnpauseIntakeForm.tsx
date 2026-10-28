@@ -855,7 +855,7 @@ export default function UnpauseIntakeForm() {
       {(step.kind === "slide" || step.kind === "review") && (
         <div className="fixed inset-x-0 top-0 z-20 h-[3px] bg-neutral-900/10">
           <motion.div
-            className="h-full bg-neutral-900"
+            className="h-full bg-[#004ac7]"
             initial={false}
             animate={{ width: `${progress}%` }}
             transition={{ type: "spring", stiffness: 220, damping: 30 }}
