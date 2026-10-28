@@ -1041,9 +1041,9 @@ export default function UnpauseIntakeForm() {
                           <div className="flex max-w-prose flex-col gap-4">
                             <motion.div
                               initial={{ height: 0 }}
-                              animate={{ height: 56 }}
+                              animate={{ height: 28 }}
                               transition={{ duration: 0.55, ease: EASE }}
-                              className="w-0.5 rounded-full bg-[#004ac7]/60"
+                              className="w-0.5 rounded-full bg-neutral-900/30"
                             />
                             <motion.p
                               variants={textItemVariants}
