@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { waitUntil } from "@vercel/functions";
 import { sql } from "../_lib/db.js";
 import { randomUUID } from "node:crypto";
 import { buildSubmissionPdf } from "../_lib/pdf.js";
@@ -41,12 +42,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   res.status(200).json({ ok: true, id });
 
-  try {
-    const typedAnswers = answers as Record<string, unknown>;
-    const analysis = await generateSmartAnalysis(typedAnswers);
-    const pdfBuffer = await buildSubmissionPdf({ id, submittedAt, answers: typedAnswers, analysis });
-    await uploadSubmissionPdfToDrive({ id, submittedAt, answers: typedAnswers }, pdfBuffer);
-  } catch (err) {
-    console.error("submit: PDF/Drive upload failed", err);
-  }
+  waitUntil(
+    (async () => {
+      try {
+        const typedAnswers = answers as Record<string, unknown>;
+        const analysis = await generateSmartAnalysis(typedAnswers);
+        const pdfBuffer = await buildSubmissionPdf({ id, submittedAt, answers: typedAnswers, analysis });
+        await uploadSubmissionPdfToDrive({ id, submittedAt, answers: typedAnswers }, pdfBuffer);
+        console.log("submit: PDF/Drive upload succeeded", id);
+      } catch (err) {
+        console.error("submit: PDF/Drive upload failed", err);
+      }
+    })(),
+  );
 }
