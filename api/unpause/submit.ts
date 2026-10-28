@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { sql } from "@vercel/postgres";
+import { sql } from "../_lib/db.js";
 import { randomUUID } from "node:crypto";
 
 async function ensureTable() {

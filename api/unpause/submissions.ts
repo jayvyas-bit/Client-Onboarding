@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { sql } from "@vercel/postgres";
+import { sql } from "../_lib/db.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {
@@ -15,13 +15,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     )
   `;
 
-  const { rows } = await sql`
+  const rows = await sql`
     SELECT id, submitted_at, answers FROM unpause_submissions ORDER BY submitted_at DESC
   `;
 
-  const submissions = rows.map((row) => ({
+  const submissions = rows.map((row: Record<string, unknown>) => ({
     id: row.id as string,
-    submittedAt: new Date(row.submitted_at as string).toISOString(),
+    submittedAt: new Date(row.submitted_at as string | Date).toISOString(),
     answers: row.answers,
   }));
 
