@@ -243,7 +243,7 @@ function ShortTextInput({
           }
         }}
       />
-      <MicButton onTranscript={(text) => onChange(value ? `${value} ${text}` : text)} />
+      <MicButton value={value ?? ""} onChange={onChange} />
     </div>
   );
 }
@@ -273,7 +273,7 @@ function LongTextInput({
         onChange={(e) => onChange(e.target.value)}
       />
       <div className="flex items-center gap-2.5">
-        <MicButton onTranscript={(text) => onChange(value ? `${value} ${text}` : text)} />
+        <MicButton value={value ?? ""} onChange={onChange} />
         {shouldReduceMotion ? (
           <span className="text-xs text-neutral-400">{hintText}</span>
         ) : (
@@ -680,9 +680,7 @@ function UploadOrTextInput({
             onChange={(e) => handleFiles(e.target.files)}
           />
         </motion.label>
-        <MicButton
-          onTranscript={(text) => onChange({ ...current, text: current.text ? `${current.text} ${text}` : text })}
-        />
+        <MicButton value={current.text} onChange={(text) => onChange({ ...current, text })} />
       </div>
       {uploadError && (
         <p className="text-sm text-red-600" role="alert">
