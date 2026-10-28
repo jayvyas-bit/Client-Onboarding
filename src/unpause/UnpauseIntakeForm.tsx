@@ -10,7 +10,12 @@ import type { AnswerPart, FieldSpec, UploadOrTextValue } from "./types";
 
 type AnswerStore = Record<string, unknown>;
 
-type Step = { kind: "intro" } | { kind: "slide"; index: number } | { kind: "review" } | { kind: "done" };
+type Step =
+  | { kind: "intro" }
+  | { kind: "resume" }
+  | { kind: "slide"; index: number }
+  | { kind: "review" }
+  | { kind: "done" };
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -24,6 +29,7 @@ function keyFor(questionId: string, partId: string) {
 }
 
 function stepPosition(step: Step, slideCount: number): number {
+  if (step.kind === "resume") return -2;
   if (step.kind === "intro") return -1;
   if (step.kind === "slide") return step.index;
   if (step.kind === "review") return slideCount;
@@ -809,13 +815,19 @@ function PartRenderer({
 }
 
 export default function UnpauseIntakeForm() {
+  const initialDraftRef = useRef<{ step: Step; answers: AnswerStore } | null>(loadDraft());
+
   const [step, setStep] = useState<Step>(() => {
-    const draft = loadDraft();
+    const draft = initialDraftRef.current;
+    if (draft && Object.keys(draft.answers ?? {}).length > 0) {
+      return { kind: "resume" };
+    }
     const initialSlideCount = buildSlides(getActiveSections(draft?.answers ?? {})).length;
     return restoreStep(draft, initialSlideCount);
   });
   const [direction, setDirection] = useState(1);
-  const [answers, setAnswers] = useState<AnswerStore>(() => loadDraft()?.answers ?? {});
+  const [answers, setAnswers] = useState<AnswerStore>(() => initialDraftRef.current?.answers ?? {});
+  const [confirmingReset, setConfirmingReset] = useState(false);
   const activeSections = useMemo(() => getActiveSections(answers), [answers]);
   const slides = useMemo(() => buildSlides(activeSections), [activeSections]);
   const questionOrdinals = useMemo(() => getQuestionOrdinals(slides), [slides]);
@@ -828,6 +840,7 @@ export default function UnpauseIntakeForm() {
   const continueControls = useAnimationControls();
 
   useEffect(() => {
+    if (step.kind === "resume") return;
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({ step, answers }));
     } catch {
@@ -835,12 +848,21 @@ export default function UnpauseIntakeForm() {
     }
   }, [step, answers]);
 
+  useEffect(() => {
+    if (!confirmingReset) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setConfirmingReset(false);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [confirmingReset]);
+
   function setAnswer(key: string, value: unknown) {
     setAnswers((prev) => ({ ...prev, [key]: value }));
   }
 
   function resetDraft() {
-    if (!window.confirm("Start over and clear your answers?")) return;
+    setConfirmingReset(false);
     try {
       localStorage.removeItem(DRAFT_KEY);
     } catch {
@@ -851,6 +873,19 @@ export default function UnpauseIntakeForm() {
     setSubmitError(null);
     transitionTo({ kind: "intro" });
   }
+
+  function resumeDraft() {
+    const draft = initialDraftRef.current;
+    transitionTo(restoreStep(draft, slides.length));
+  }
+
+  const resumeOrdinal = useMemo(() => {
+    if (step.kind !== "resume") return 0;
+    const restored = restoreStep(initialDraftRef.current, slides.length);
+    if (restored.kind === "slide") return questionOrdinals[restored.index] ?? 0;
+    if (restored.kind === "review" || restored.kind === "done") return totalQuestions;
+    return 0;
+  }, [step.kind, slides.length, questionOrdinals, totalQuestions]);
 
   function transitionTo(next: Step) {
     setDirection(stepPosition(next, slides.length) >= stepPosition(step, slides.length) ? 1 : -1);
@@ -965,7 +1000,9 @@ export default function UnpauseIntakeForm() {
         ? "Review your answers before submitting."
         : step.kind === "done"
           ? "Submission complete. Thank you."
-          : "";
+          : step.kind === "resume"
+            ? "Welcome back. Pick up where you left off, or start over."
+            : "";
 
   return (
     <div className="relative min-h-dvh bg-[#faf8f5]">
@@ -999,14 +1036,52 @@ export default function UnpauseIntakeForm() {
         </div>
         <div className="relative pt-6 text-center sm:pt-8">
           <span className="text-sm font-semibold tracking-[0.3em] text-neutral-900">UNPAUSE</span>
-          {step.kind !== "intro" && (
-            <button
-              type="button"
-              onClick={resetDraft}
-              className="absolute right-6 top-6 text-xs font-medium text-neutral-400 transition hover:text-neutral-600 sm:right-10 sm:top-8"
-            >
-              Start over
-            </button>
+          {step.kind !== "intro" && step.kind !== "resume" && (
+            <div className="absolute right-6 top-5 sm:right-10 sm:top-7">
+              {confirmingReset && (
+                <button
+                  type="button"
+                  aria-hidden="true"
+                  tabIndex={-1}
+                  className="fixed inset-0 z-20 cursor-default"
+                  onClick={() => setConfirmingReset(false)}
+                />
+              )}
+              <button
+                type="button"
+                aria-haspopup="true"
+                aria-expanded={confirmingReset}
+                onClick={() => setConfirmingReset((v) => !v)}
+                className="relative z-30 text-xs font-medium text-neutral-400 transition hover:text-neutral-600"
+              >
+                Start over
+              </button>
+              <AnimatePresence>
+                {confirmingReset && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.96 }}
+                    transition={{ duration: 0.16, ease: EASE }}
+                    className="absolute right-0 top-full z-30 mt-2 w-56 rounded-xl border border-neutral-900/10 bg-white p-3 text-left shadow-lg"
+                  >
+                    <p className="text-xs text-neutral-600 leading-relaxed">Clear your answers and start over?</p>
+                    <div className="mt-2.5 flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmingReset(false)}
+                        className="rounded-full px-3 py-1.5 text-xs font-medium text-neutral-500 transition hover:text-neutral-800"
+                      >
+                        Keep going
+                      </button>
+                      <button type="button" onClick={resetDraft} className="rounded-full bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-neutral-800">
+                        Start over
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           )}
         </div>
         <div className="flex flex-1 items-start justify-center px-6 py-10 sm:px-10 sm:py-14">
@@ -1062,6 +1137,49 @@ export default function UnpauseIntakeForm() {
                     >
                       Ready? Let's begin
                     </motion.button>
+                  </div>
+                )}
+
+                {step.kind === "resume" && (
+                  <div className="flex flex-col gap-6">
+                    <div className="max-w-prose">
+                      <motion.div variants={textItemVariants} className="text-[#004ac7]">
+                        <UnpauseMark />
+                      </motion.div>
+                      <motion.p variants={textItemVariants} className={EYEBROW_LABEL + " mt-4"}>
+                        WELCOME BACK
+                      </motion.p>
+                      <motion.h1
+                        variants={textItemVariants}
+                        className="mt-2 text-3xl font-medium text-neutral-900 sm:text-4xl"
+                      >
+                        Pick up where you left off?
+                      </motion.h1>
+                      <motion.p variants={textItemVariants} className="mt-4 text-neutral-600 leading-relaxed">
+                        {resumeOrdinal > 0
+                          ? `You're partway through The Unbrief — question ${resumeOrdinal} of ${totalQuestions}.`
+                          : "You started The Unbrief but haven't answered a question yet."}
+                      </motion.p>
+                    </div>
+                    <motion.div variants={textItemVariants} className="flex flex-wrap items-center gap-3">
+                      <motion.button
+                        type="button"
+                        whileHover={{ y: -2, boxShadow: "0 12px 30px rgba(0,0,0,0.14)" }}
+                        whileTap={{ scale: 0.97 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 26 }}
+                        className="rounded-full bg-[#01213B] px-8 py-3 text-sm font-medium text-white"
+                        onClick={resumeDraft}
+                      >
+                        Continue where I left off
+                      </motion.button>
+                      <button
+                        type="button"
+                        onClick={resetDraft}
+                        className="rounded-full border border-neutral-300 px-8 py-3 text-sm font-medium text-neutral-600 transition hover:border-neutral-500 hover:text-neutral-900"
+                      >
+                        Start over
+                      </button>
+                    </motion.div>
                   </div>
                 )}
 
