@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "motion/react";
 import { upload } from "@vercel/blob/client";
 import { INTRO, SECTIONS, THANK_YOU } from "./content";
 import { QUESTION_ORDINALS, SLIDES, TOTAL_QUESTIONS } from "./flow";
@@ -207,6 +207,31 @@ function LongTextInput({
   );
 }
 
+function AnimatedOrdinal({ value }: { value: number }) {
+  const shouldReduceMotion = useReducedMotion();
+  if (shouldReduceMotion) return <span className="tabular-nums">{value}</span>;
+
+  const digits = String(value).split("");
+  return (
+    <span className="inline-flex tabular-nums">
+      <AnimatePresence mode="popLayout" initial={false}>
+        {digits.map((digit, i) => (
+          <motion.span
+            key={`${value}-${i}`}
+            initial={{ y: 8, opacity: 0, filter: "blur(3px)" }}
+            animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+            exit={{ y: -8, opacity: 0, filter: "blur(3px)" }}
+            transition={{ duration: 0.22, delay: i * 0.03, ease: EASE }}
+            className="inline-block"
+          >
+            {digit}
+          </motion.span>
+        ))}
+      </AnimatePresence>
+    </span>
+  );
+}
+
 function OptionRow({
   index,
   label,
@@ -253,9 +278,9 @@ function OptionRow({
           {selected ? (
             <motion.svg
               key="check"
-              initial={{ scale: 0, opacity: 0 }}
+              initial={{ scale: 0.6, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
+              exit={{ scale: 0.6, opacity: 0 }}
               transition={{ duration: 0.15 }}
               width="12"
               height="12"
@@ -266,7 +291,12 @@ function OptionRow({
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <polyline points="20 6 9 17 4 12" />
+              <motion.polyline
+                points="20 6 9 17 4 12"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.25, delay: 0.05, ease: EASE }}
+              />
             </motion.svg>
           ) : (
             <motion.span
@@ -715,9 +745,11 @@ export default function UnpauseIntakeForm() {
   const [direction, setDirection] = useState(1);
   const [answers, setAnswers] = useState<AnswerStore>(() => loadDraft()?.answers ?? {});
   const [submitting, setSubmitting] = useState(false);
+  const [submitSucceeded, setSubmitSucceeded] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const slideRef = useRef<HTMLDivElement>(null);
   const shouldReduceMotion = useReducedMotion();
+  const continueControls = useAnimationControls();
 
   useEffect(() => {
     try {
@@ -764,11 +796,13 @@ export default function UnpauseIntakeForm() {
       } catch {
         // ignore
       }
+      setSubmitting(false);
+      setSubmitSucceeded(true);
+      await new Promise((resolve) => setTimeout(resolve, shouldReduceMotion ? 0 : 550));
       transitionTo({ kind: "done" });
     } catch {
-      setSubmitError("Something went wrong sending your answers. Please try again.");
-    } finally {
       setSubmitting(false);
+      setSubmitError("Something went wrong sending your answers. Please try again.");
     }
   }
 
@@ -926,7 +960,7 @@ export default function UnpauseIntakeForm() {
                               <div className="flex flex-col gap-8">
                                 <div className="max-w-prose">
                                   <p className="text-xs font-medium tracking-[0.2em] text-neutral-400">
-                                    QUESTION {ordinal} OF {TOTAL_QUESTIONS}
+                                    QUESTION <AnimatedOrdinal value={ordinal} /> OF {TOTAL_QUESTIONS}
                                   </p>
                                   <h2
                                     id={mainHeadingId}
@@ -1077,28 +1111,100 @@ export default function UnpauseIntakeForm() {
               )}
               <motion.button
                 type="button"
-                disabled={(step.kind === "review" && submitting) || (step.kind === "slide" && !canAdvance)}
+                disabled={step.kind === "review" && (submitting || submitSucceeded)}
+                animate={continueControls}
                 whileHover={
-                  (step.kind === "review" && submitting) || (step.kind === "slide" && !canAdvance)
+                  (step.kind === "review" && (submitting || submitSucceeded)) ||
+                  (step.kind === "slide" && !canAdvance)
                     ? undefined
                     : { y: -2, boxShadow: "0 10px 25px -10px rgba(0,0,0,0.35)" }
                 }
-                whileTap={
-                  (step.kind === "review" && submitting) || (step.kind === "slide" && !canAdvance)
-                    ? undefined
-                    : { scale: 0.97 }
-                }
+                whileTap={step.kind === "review" && (submitting || submitSucceeded) ? undefined : { scale: 0.97 }}
                 transition={{ type: "spring", stiffness: 400, damping: 26 }}
-                className="rounded-full bg-[#01213B] px-8 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
-                onClick={() => (step.kind === "review" ? handleSubmit() : goTo(step.index + 1))}
+                className={`flex items-center gap-2 rounded-full bg-[#01213B] px-8 py-3 text-sm font-medium text-white disabled:cursor-not-allowed ${
+                  step.kind === "slide" && !canAdvance ? "cursor-not-allowed opacity-40" : ""
+                } disabled:opacity-40`}
+                onClick={() => {
+                  if (step.kind === "slide" && !canAdvance) {
+                    if (!shouldReduceMotion) {
+                      continueControls.start({
+                        x: [0, -8, 8, -6, 6, -3, 3, 0],
+                        transition: { duration: 0.4, ease: [0.36, 0.07, 0.19, 0.97] },
+                      });
+                    }
+                    return;
+                  }
+                  if (step.kind === "review") {
+                    handleSubmit();
+                  } else {
+                    goTo(step.index + 1);
+                  }
+                }}
               >
-                {step.kind === "review"
-                  ? submitting
-                    ? "Submitting..."
-                    : "Submit The Unbrief"
-                  : step.index === SLIDES.length - 1
-                    ? "Review your answers"
-                    : "Continue"}
+                <AnimatePresence mode="wait" initial={false}>
+                  {step.kind === "review" && submitting && (
+                    <motion.svg
+                      key="spinner"
+                      initial={{ opacity: 0, scale: 0.6 }}
+                      animate={{ opacity: 1, scale: 1, rotate: 360 }}
+                      exit={{ opacity: 0, scale: 0.6 }}
+                      transition={{
+                        opacity: { duration: 0.15 },
+                        scale: { duration: 0.15 },
+                        rotate: shouldReduceMotion
+                          ? { duration: 0 }
+                          : { duration: 0.7, repeat: Infinity, ease: "linear" },
+                      }}
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                    >
+                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
+                      <path
+                        d="M21 12a9 9 0 0 0-9-9"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                      />
+                    </motion.svg>
+                  )}
+                  {step.kind === "review" && submitSucceeded && (
+                    <motion.svg
+                      key="check"
+                      initial={{ opacity: 0, scale: 0.6 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.6 }}
+                      transition={{ duration: 0.2 }}
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <motion.polyline
+                        points="20 6 9 17 4 12"
+                        initial={{ pathLength: 0 }}
+                        animate={{ pathLength: 1 }}
+                        transition={{ duration: 0.3, ease: EASE }}
+                      />
+                    </motion.svg>
+                  )}
+                </AnimatePresence>
+                <span>
+                  {step.kind === "review"
+                    ? submitSucceeded
+                      ? "Sent!"
+                      : submitting
+                        ? "Submitting..."
+                        : "Submit The Unbrief"
+                    : step.index === SLIDES.length - 1
+                      ? "Review your answers"
+                      : "Continue"}
+                </span>
               </motion.button>
             </div>
           </div>
