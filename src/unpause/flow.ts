@@ -1,5 +1,5 @@
-import { SECTIONS } from "./content";
-import type { QuestionSpec, SectionSpec } from "./types";
+import { SECTIONS } from "./content.js";
+import type { QuestionSpec, SectionSpec } from "./types.js";
 
 export interface DividerSlide {
   kind: "divider";

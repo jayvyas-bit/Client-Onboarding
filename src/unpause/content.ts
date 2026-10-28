@@ -1,4 +1,4 @@
-import type { SectionSpec } from "./types";
+import type { SectionSpec } from "./types.js";
 
 const LOGO_RELEVANT_OPTIONS = [
   "A new logo",

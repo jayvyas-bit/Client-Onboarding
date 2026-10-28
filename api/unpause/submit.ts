@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { sql } from "../_lib/db.js";
 import { randomUUID } from "node:crypto";
+import { buildSubmissionPdf } from "../_lib/pdf.js";
+import { sendSubmissionNotification } from "../_lib/email.js";
 
 async function ensureTable() {
   await sql`
@@ -35,4 +37,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   `;
 
   res.status(200).json({ ok: true, id });
+
+  try {
+    const pdfBuffer = await buildSubmissionPdf({ id, submittedAt, answers: answers as Record<string, unknown> });
+    await sendSubmissionNotification({ id, submittedAt, answers: answers as Record<string, unknown> }, pdfBuffer);
+  } catch (err) {
+    console.error("submit: PDF/email notification failed", err);
+  }
 }
