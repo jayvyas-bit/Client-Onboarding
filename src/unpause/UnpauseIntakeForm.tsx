@@ -839,6 +839,19 @@ export default function UnpauseIntakeForm() {
     setAnswers((prev) => ({ ...prev, [key]: value }));
   }
 
+  function resetDraft() {
+    if (!window.confirm("Start over and clear your answers?")) return;
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // ignore
+    }
+    setAnswers({});
+    setSubmitSucceeded(false);
+    setSubmitError(null);
+    transitionTo({ kind: "intro" });
+  }
+
   function transitionTo(next: Step) {
     setDirection(stepPosition(next, slides.length) >= stepPosition(step, slides.length) ? 1 : -1);
     setStep(next);
@@ -984,8 +997,17 @@ export default function UnpauseIntakeForm() {
         <div aria-live="polite" className="sr-only">
           {liveAnnouncement}
         </div>
-        <div className="pt-6 text-center sm:pt-8">
+        <div className="relative pt-6 text-center sm:pt-8">
           <span className="text-sm font-semibold tracking-[0.3em] text-neutral-900">UNPAUSE</span>
+          {step.kind !== "intro" && (
+            <button
+              type="button"
+              onClick={resetDraft}
+              className="absolute right-6 top-6 text-xs font-medium text-neutral-400 transition hover:text-neutral-600 sm:right-10 sm:top-8"
+            >
+              Start over
+            </button>
+          )}
         </div>
         <div className="flex flex-1 items-start justify-center px-6 py-10 sm:px-10 sm:py-14">
           <div className="w-full max-w-4xl rounded-3xl border border-neutral-900/5 bg-[#fffefb] p-8 shadow-[0_8px_40px_rgba(0,0,0,0.06)] sm:p-12">
