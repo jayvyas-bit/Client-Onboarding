@@ -948,7 +948,7 @@ export default function UnpauseIntakeForm() {
         <div className="pt-6 text-center sm:pt-8">
           <span className="text-sm font-semibold tracking-[0.3em] text-neutral-900">UNPAUSE</span>
         </div>
-        <div className="flex flex-1 items-center justify-center px-6 py-10 sm:px-10 sm:py-14">
+        <div className="flex flex-1 items-start justify-center px-6 py-10 sm:px-10 sm:py-14">
           <div className="w-full max-w-4xl rounded-3xl border border-neutral-900/5 bg-[#fffefb] p-8 shadow-[0_8px_40px_rgba(0,0,0,0.06)] sm:p-12">
             <AnimatePresence mode="wait" custom={direction} initial={false}>
               <motion.div
