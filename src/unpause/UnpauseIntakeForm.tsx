@@ -16,6 +16,8 @@ const EASE = [0.16, 1, 0.3, 1] as const;
 const UNDERLINE_INPUT =
   "w-full border-b-2 border-neutral-300 bg-transparent px-0.5 pb-2.5 pt-1 text-lg text-neutral-900 outline-none transition-colors placeholder:text-neutral-400 placeholder:italic focus:border-neutral-900";
 
+const EYEBROW_LABEL = "text-xs font-medium tracking-[0.2em] text-neutral-400";
+
 function keyFor(questionId: string, partId: string) {
   return `${questionId}.${partId}`;
 }
@@ -76,6 +78,45 @@ function isSlideComplete(slide: Slide | null, answers: AnswerStore): boolean {
     const value = (answers[key] as Record<string, string>) ?? {};
     return part.part.fields.every((field) => isFieldValid(field, value[field.id] ?? ""));
   });
+}
+
+function formatAnswerValue(part: AnswerPart, value: unknown, otherValue: string): string | null {
+  switch (part.kind) {
+    case "fields": {
+      const v = (value as Record<string, string>) ?? {};
+      const filled = part.fields.map((f) => v[f.id]?.trim()).filter((s): s is string => Boolean(s));
+      return filled.length ? filled.join(" · ") : null;
+    }
+    case "short-text":
+    case "long-text": {
+      const v = ((value as string) ?? "").trim();
+      return v || null;
+    }
+    case "single-select": {
+      const v = (value as string) ?? "";
+      if (!v) return null;
+      return v === "Something else" ? otherValue.trim() || v : v;
+    }
+    case "multi-select": {
+      const v = (value as string[]) ?? [];
+      if (!v.length) return null;
+      return v.map((o) => (o === "Something else" ? otherValue.trim() || o : o)).join(", ");
+    }
+    case "scale-pairs": {
+      const v = (value as Record<number, number>) ?? {};
+      const entries = part.pairs
+        .map((pair, i) => (v[i] !== undefined ? `${pair[0]} ↔ ${pair[1]}: ${v[i]}` : null))
+        .filter((s): s is string => Boolean(s));
+      return entries.length ? entries.join(" · ") : null;
+    }
+    case "upload-or-text": {
+      const v = (value as UploadOrTextValue) ?? { text: "", files: [] };
+      const bits: string[] = [];
+      if (v.text?.trim()) bits.push(v.text.trim());
+      if (v.files?.length) bits.push(`${v.files.length} file${v.files.length > 1 ? "s" : ""} attached`);
+      return bits.length ? bits.join(" · ") : null;
+    }
+  }
 }
 
 function useOptionShortcuts(
@@ -848,6 +889,32 @@ export default function UnpauseIntakeForm() {
     center: { opacity: 1, y: 0, transition: { duration: 0.45, ease: EASE } },
   };
 
+  const reviewSections = SECTIONS.map((section) => {
+    const items = section.questions.flatMap((question) =>
+      question.parts
+        .map((part) => {
+          const key = keyFor(question.id, part.id);
+          const otherVal = (answers[`${key}__other`] as string) ?? "";
+          const display = formatAnswerValue(part.part, answers[key], otherVal);
+          if (!display) return null;
+          return { label: part.label ?? question.prompt, display };
+        })
+        .filter((item): item is { label: string; display: string } => item !== null),
+    );
+    return { section, items };
+  }).filter((entry) => entry.items.length > 0);
+
+  const liveAnnouncement =
+    step.kind === "slide" && slide
+      ? slide.kind === "divider"
+        ? `Section ${slide.section.number}: ${slide.section.title}`
+        : `Question ${QUESTION_ORDINALS[step.index]} of ${TOTAL_QUESTIONS}: ${slide.question.prompt}`
+      : step.kind === "review"
+        ? "Review your answers before submitting."
+        : step.kind === "done"
+          ? "Submission complete. Thank you."
+          : "";
+
   return (
     <div className="relative min-h-dvh bg-[#faf8f5]">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
@@ -875,6 +942,9 @@ export default function UnpauseIntakeForm() {
       )}
 
       <div className="relative z-10 flex min-h-dvh flex-col">
+        <div aria-live="polite" className="sr-only">
+          {liveAnnouncement}
+        </div>
         <div className="pt-6 text-center sm:pt-8">
           <span className="text-sm font-semibold tracking-[0.3em] text-neutral-900">UNPAUSE</span>
         </div>
@@ -896,7 +966,7 @@ export default function UnpauseIntakeForm() {
                     <div className="max-w-prose">
                       <motion.p
                         variants={textItemVariants}
-                        className="text-xs font-medium tracking-[0.2em] text-neutral-400"
+                        className={EYEBROW_LABEL}
                       >
                         {INTRO.eyebrow}
                       </motion.p>
@@ -971,7 +1041,7 @@ export default function UnpauseIntakeForm() {
                             />
                             <motion.p
                               variants={textItemVariants}
-                              className="text-xs font-medium tracking-[0.2em] text-neutral-400"
+                              className={EYEBROW_LABEL}
                             >
                               SECTION {slide.section.number} / {String(SECTIONS.length).padStart(2, "0")}
                             </motion.p>
@@ -999,7 +1069,7 @@ export default function UnpauseIntakeForm() {
                                 <div className="max-w-prose">
                                   <motion.p
                                     variants={textItemVariants}
-                                    className="text-xs font-medium tracking-[0.2em] text-neutral-400"
+                                    className={EYEBROW_LABEL}
                                   >
                                     QUESTION <AnimatedOrdinal value={ordinal} /> OF {TOTAL_QUESTIONS}
                                   </motion.p>
@@ -1066,10 +1136,7 @@ export default function UnpauseIntakeForm() {
 
                 {step.kind === "review" && (
                   <div className="flex flex-col gap-6">
-                    <motion.p
-                      variants={textItemVariants}
-                      className="text-xs font-medium tracking-[0.2em] text-neutral-400"
-                    >
+                    <motion.p variants={textItemVariants} className={EYEBROW_LABEL}>
                       BEFORE YOU GO.
                     </motion.p>
                     <motion.h2
@@ -1079,17 +1146,32 @@ export default function UnpauseIntakeForm() {
                       One last look.
                     </motion.h2>
                     <motion.p variants={textItemVariants} className="text-neutral-600 leading-relaxed">
-                      Here's a summary of what you've shared with us:
+                      Here's what you've shared with us so far:
                     </motion.p>
-                    <motion.ul variants={textItemVariants} className="list-disc pl-5 text-neutral-600">
-                      <li>Your brand and what you do</li>
-                      <li>What you're looking to create</li>
-                      <li>What matters most</li>
-                      <li>Your creative direction and references</li>
-                      <li>What you'll need delivered</li>
-                      <li>Your preferred timeline</li>
-                      <li>Your investment range and budget ceiling</li>
-                    </motion.ul>
+                    <motion.div variants={textItemVariants} className="flex flex-col gap-5">
+                      {reviewSections.map(({ section, items }, i) => (
+                        <div
+                          key={section.id}
+                          className={
+                            i > 0
+                              ? "flex flex-col gap-2.5 border-t border-neutral-900/10 pt-5"
+                              : "flex flex-col gap-2.5"
+                          }
+                        >
+                          <h3 className="text-xs font-semibold uppercase tracking-wide text-[#004ac7]">
+                            {section.title}
+                          </h3>
+                          <dl className="flex flex-col gap-2">
+                            {items.map((item, j) => (
+                              <div key={j} className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
+                                <dt className="text-sm text-neutral-500 sm:w-56 sm:shrink-0">{item.label}</dt>
+                                <dd className="text-sm font-medium text-neutral-800">{item.display}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </div>
+                      ))}
+                    </motion.div>
                     <motion.p variants={textItemVariants} className="text-sm text-neutral-500">
                       You can go back to review or change any of your answers before submitting.
                     </motion.p>
@@ -1102,12 +1184,12 @@ export default function UnpauseIntakeForm() {
                 )}
 
                 {step.kind === "done" && (
-                  <div className="flex flex-col gap-5 py-10 text-center">
+                  <div className="flex flex-col gap-8 py-10 text-center">
                     <motion.svg
                       width="64"
                       height="64"
                       viewBox="0 0 64 64"
-                      className="mx-auto text-neutral-900"
+                      className="mx-auto text-[#004ac7]"
                     >
                       <motion.circle
                         cx="32"
@@ -1132,27 +1214,37 @@ export default function UnpauseIntakeForm() {
                         transition={{ duration: 0.4, delay: 0.5, ease: EASE }}
                       />
                     </motion.svg>
-                    <motion.p
-                      variants={textItemVariants}
-                      className="text-xs font-medium tracking-[0.2em] text-neutral-400"
-                    >
-                      THANK YOU.
-                    </motion.p>
-                    <motion.h2 variants={textItemVariants} className="text-2xl font-medium text-neutral-900">
-                      {THANK_YOU.title}
-                    </motion.h2>
-                    {THANK_YOU.body.map((p) => (
-                      <motion.p key={p} variants={textItemVariants} className="text-neutral-600 leading-relaxed">
-                        {p}
+                    <div className="flex flex-col gap-3">
+                      <motion.p variants={textItemVariants} className={EYEBROW_LABEL}>
+                        THANK YOU.
                       </motion.p>
-                    ))}
-                    <motion.p variants={textItemVariants} className="mt-2 font-medium text-neutral-900">
-                      {THANK_YOU.cta}
-                    </motion.p>
-                    <motion.p variants={textItemVariants} className="text-sm text-neutral-500">
-                      {THANK_YOU.signoff}
-                    </motion.p>
-                    <motion.p variants={textItemVariants} className="mt-6 text-sm tracking-wide text-neutral-400">
+                      <motion.h2
+                        variants={textItemVariants}
+                        className="text-2xl font-medium text-neutral-900 sm:text-3xl"
+                      >
+                        {THANK_YOU.title}
+                      </motion.h2>
+                    </div>
+                    <div className="mx-auto flex max-w-md flex-col gap-4">
+                      {THANK_YOU.body.map((p, i) => (
+                        <motion.p
+                          key={p}
+                          variants={textItemVariants}
+                          className={i === 0 ? "text-lg text-neutral-800 leading-relaxed" : "text-neutral-600 leading-relaxed"}
+                        >
+                          {p}
+                        </motion.p>
+                      ))}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <motion.p variants={textItemVariants} className="font-medium text-[#004ac7]">
+                        {THANK_YOU.cta}
+                      </motion.p>
+                      <motion.p variants={textItemVariants} className="text-sm text-neutral-500">
+                        {THANK_YOU.signoff}
+                      </motion.p>
+                    </div>
+                    <motion.p variants={textItemVariants} className="text-sm tracking-wide text-neutral-400">
                       — Unpause
                     </motion.p>
                   </div>
