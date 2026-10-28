@@ -1,24 +1,14 @@
 import { useState } from "react";
+import { upload } from "@vercel/blob/client";
 import { SECTIONS, INTRO, THANK_YOU } from "./content";
-import type { AnswerPart, FieldSpec, QuestionPart, QuestionSpec } from "./types";
+import type { AnswerPart, FieldSpec, QuestionPart, QuestionSpec, UploadOrTextValue } from "./types";
 
-type ClientUploadFile = { name: string; size: number; dataUrl: string };
-type ClientUploadValue = { text: string; files: ClientUploadFile[] };
 type AnswerStore = Record<string, unknown>;
 
 type Step = { kind: "intro" } | { kind: "section"; index: number } | { kind: "review" } | { kind: "done" };
 
 function keyFor(questionId: string, partId: string) {
   return `${questionId}.${partId}`;
-}
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
 }
 
 function FieldsInput({
@@ -241,20 +231,34 @@ function UploadOrTextInput({
   onChange,
   placeholder,
 }: {
-  value: ClientUploadValue;
-  onChange: (next: ClientUploadValue) => void;
+  value: UploadOrTextValue;
+  onChange: (next: UploadOrTextValue) => void;
   placeholder?: string;
 }) {
   const current = value ?? { text: "", files: [] };
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   async function handleFiles(fileList: FileList | null) {
-    if (!fileList) return;
-    const newFiles: ClientUploadFile[] = [];
-    for (const file of Array.from(fileList)) {
-      const dataUrl = await fileToDataUrl(file);
-      newFiles.push({ name: file.name, size: file.size, dataUrl });
+    if (!fileList || fileList.length === 0) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const uploaded = await Promise.all(
+        Array.from(fileList).map(async (file) => {
+          const blob = await upload(file.name, file, {
+            access: "public",
+            handleUploadUrl: "/api/unpause/upload",
+          });
+          return { name: file.name, size: file.size, path: blob.url };
+        }),
+      );
+      onChange({ ...current, files: [...current.files, ...uploaded] });
+    } catch {
+      setUploadError("Couldn't upload that file. Please try again.");
+    } finally {
+      setUploading(false);
     }
-    onChange({ ...current, files: [...current.files, ...newFiles] });
   }
 
   function removeFile(name: string) {
@@ -271,15 +275,17 @@ function UploadOrTextInput({
         onChange={(e) => onChange({ ...current, text: e.target.value })}
       />
       <label className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-dashed border-neutral-300 px-3.5 py-2.5 text-sm text-neutral-600 transition hover:border-neutral-500">
-        <span>+ Upload image(s)</span>
+        <span>{uploading ? "Uploading..." : "+ Upload image(s)"}</span>
         <input
           type="file"
           accept="image/*,.pdf"
           multiple
+          disabled={uploading}
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
       </label>
+      {uploadError && <p className="text-sm text-red-600">{uploadError}</p>}
       {current.files.length > 0 && (
         <ul className="flex flex-col gap-1.5">
           {current.files.map((f) => (
@@ -360,7 +366,7 @@ function PartRenderer({
     case "upload-or-text":
       return (
         <UploadOrTextInput
-          value={(value as ClientUploadValue) ?? { text: "", files: [] }}
+          value={(value as UploadOrTextValue) ?? { text: "", files: [] }}
           onChange={onChange}
           placeholder={part.placeholder}
         />

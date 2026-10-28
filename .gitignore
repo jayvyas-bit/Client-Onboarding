@@ -21,3 +21,5 @@ dist-ssr
 
 # Intake submissions may contain real contact info — never commit
 data/
+.vercel
+.env*
