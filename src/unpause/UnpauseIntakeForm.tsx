@@ -830,8 +830,8 @@ export default function UnpauseIntakeForm() {
       )}
 
       <div className="relative z-10 flex min-h-dvh flex-col">
-        <div className="flex flex-1 items-center justify-center px-6 py-20 sm:px-10">
-          <div className="w-full max-w-2xl rounded-3xl border border-neutral-900/5 bg-[#fffefb] p-8 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.15)] sm:p-12">
+        <div className="flex flex-1 items-center justify-center px-6 py-10 sm:px-10 sm:py-14">
+          <div className="w-full max-w-4xl rounded-3xl border border-neutral-900/5 bg-[#fffefb] p-8 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.15)] sm:p-12">
             <AnimatePresence mode="wait" custom={direction} initial={false}>
               <motion.div
                 key={stepKey}
@@ -845,14 +845,18 @@ export default function UnpauseIntakeForm() {
               >
                 {step.kind === "intro" && (
                   <div className="flex flex-col gap-6">
-                    <p className="text-xs font-medium tracking-[0.2em] text-neutral-400">{INTRO.eyebrow}</p>
-                    <h1 className="text-3xl font-medium text-neutral-900 sm:text-4xl">{INTRO.title}</h1>
-                    {INTRO.body.map((p) => (
-                      <p key={p} className="text-neutral-600 leading-relaxed">
-                        {p}
-                      </p>
-                    ))}
-                    <p className="text-sm text-neutral-500">{INTRO.time}</p>
+                    <div className="max-w-prose">
+                      <p className="text-xs font-medium tracking-[0.2em] text-neutral-400">{INTRO.eyebrow}</p>
+                      <h1 className="mt-2 text-3xl font-medium text-neutral-900 sm:text-4xl">{INTRO.title}</h1>
+                      <div className="mt-4 flex flex-col gap-4">
+                        {INTRO.body.map((p) => (
+                          <p key={p} className="text-neutral-600 leading-relaxed">
+                            {p}
+                          </p>
+                        ))}
+                      </div>
+                      <p className="mt-4 text-sm text-neutral-500">{INTRO.time}</p>
+                    </div>
 
                     <motion.div
                       variants={teamContainerVariants}
@@ -896,7 +900,7 @@ export default function UnpauseIntakeForm() {
                     return (
                       <div className="flex flex-col gap-8">
                         {slide.kind === "divider" ? (
-                          <div className="flex flex-col gap-4">
+                          <div className="flex max-w-prose flex-col gap-4">
                             <motion.div
                               initial={{ height: 0 }}
                               animate={{ height: 28 }}
@@ -920,7 +924,7 @@ export default function UnpauseIntakeForm() {
                             const mainHeadingId = `heading-${question.id}`;
                             return (
                               <div className="flex flex-col gap-8">
-                                <div>
+                                <div className="max-w-prose">
                                   <p className="text-xs font-medium tracking-[0.2em] text-neutral-400">
                                     QUESTION {ordinal} OF {TOTAL_QUESTIONS}
                                   </p>
@@ -1056,7 +1060,7 @@ export default function UnpauseIntakeForm() {
 
       {(step.kind === "slide" || step.kind === "review") && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-neutral-900/5 bg-[#faf8f5]/85 backdrop-blur">
-          <div className="mx-auto flex max-w-2xl items-center justify-between px-6 py-4 sm:px-10">
+          <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4 sm:px-10">
             <button
               type="button"
               className="-m-2 p-2 text-sm font-medium text-neutral-500 transition hover:text-neutral-900"
