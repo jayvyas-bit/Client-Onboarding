@@ -2,6 +2,8 @@ export interface FieldSpec {
   id: string;
   label: string;
   placeholder?: string;
+  required?: boolean;
+  type?: "text" | "email";
 }
 
 export type AnswerPart =

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { upload } from "@vercel/blob/client";
 import { INTRO, SECTIONS, THANK_YOU } from "./content";
 import { QUESTION_ORDINALS, SLIDES, TOTAL_QUESTIONS } from "./flow";
+import type { Slide } from "./flow";
 import MicButton from "./MicButton";
 import type { AnswerPart, FieldSpec, UploadOrTextValue } from "./types";
 
@@ -30,6 +31,76 @@ function isTypingTarget(el: Element | null): boolean {
   return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
 }
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const DRAFT_KEY = "unpause-intake-draft-v1";
+
+function loadDraft(): { step: Step; answers: AnswerStore } | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || typeof parsed.answers !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function restoreStep(draft: { step: Step; answers: AnswerStore } | null): Step {
+  const s = draft?.step;
+  if (!s || typeof s !== "object" || typeof (s as { kind?: unknown }).kind !== "string") {
+    return { kind: "intro" };
+  }
+  if (s.kind === "slide" && typeof (s as { index?: unknown }).index === "number") {
+    const maxIndex = Math.max(SLIDES.length - 1, 0);
+    return { kind: "slide", index: Math.min(Math.max((s as { index: number }).index, 0), maxIndex) };
+  }
+  if (s.kind === "intro" || s.kind === "review" || s.kind === "done") return s;
+  return { kind: "intro" };
+}
+
+function isFieldValid(field: FieldSpec, raw: string): boolean {
+  const trimmed = raw.trim();
+  if (!field.required) return true;
+  if (!trimmed) return false;
+  if (field.type === "email") return EMAIL_PATTERN.test(trimmed);
+  return true;
+}
+
+function isSlideComplete(slide: Slide | null, answers: AnswerStore): boolean {
+  if (!slide || slide.kind !== "question") return true;
+  const part = slide.part.part;
+  if (part.kind !== "fields") return true;
+  const key = keyFor(slide.question.id, slide.part.id);
+  const value = (answers[key] as Record<string, string>) ?? {};
+  return part.fields.every((field) => isFieldValid(field, value[field.id] ?? ""));
+}
+
+function useOptionShortcuts(
+  options: string[],
+  onSelect: (option: string) => void,
+  containerRef: RefObject<HTMLElement | null>,
+) {
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const active = document.activeElement;
+      if (isTypingTarget(active)) return;
+      const withinGroup = active === document.body || containerRef.current?.contains(active) === true;
+      if (!withinGroup) return;
+      const idx = Number(e.key) - 1;
+      if (idx >= 0 && idx < options.length) onSelectRef.current(options[idx]);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+    // onSelectRef keeps the handler current, so only the option set needs to retrigger this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options.join("|")]);
+}
+
 function FieldsInput({
   fields,
   value,
@@ -41,18 +112,33 @@ function FieldsInput({
 }) {
   return (
     <div className="grid gap-5 sm:grid-cols-2">
-      {fields.map((field) => (
-        <label key={field.id} className="flex flex-col gap-1.5 text-sm">
-          <span className="text-neutral-500">{field.label}</span>
-          <input
-            type="text"
-            className={UNDERLINE_INPUT + " text-base"}
-            placeholder={field.placeholder}
-            value={value?.[field.id] ?? ""}
-            onChange={(e) => onChange({ ...value, [field.id]: e.target.value })}
-          />
-        </label>
-      ))}
+      {fields.map((field) => {
+        const raw = value?.[field.id] ?? "";
+        const invalid = field.required && raw.trim().length > 0 && !isFieldValid(field, raw);
+        return (
+          <label key={field.id} className="flex flex-col gap-1.5 text-sm">
+            <span className="text-neutral-500">
+              {field.label}
+              {field.required && (
+                <span className="text-neutral-400" aria-hidden="true">
+                  {" "}
+                  *
+                </span>
+              )}
+            </span>
+            <input
+              type={field.type === "email" ? "email" : "text"}
+              className={UNDERLINE_INPUT + " text-base"}
+              placeholder={field.placeholder}
+              value={raw}
+              aria-required={field.required || undefined}
+              aria-invalid={invalid || undefined}
+              onChange={(e) => onChange({ ...value, [field.id]: e.target.value })}
+            />
+            {invalid && <span className="text-xs text-red-600">Enter a valid email address.</span>}
+          </label>
+        );
+      })}
     </div>
   );
 }
@@ -62,11 +148,13 @@ function ShortTextInput({
   onChange,
   placeholder,
   onAdvance,
+  labelledBy,
 }: {
   value: string;
   onChange: (next: string) => void;
   placeholder?: string;
   onAdvance?: () => void;
+  labelledBy?: string;
 }) {
   return (
     <div className="flex items-end gap-3">
@@ -75,6 +163,7 @@ function ShortTextInput({
         className={UNDERLINE_INPUT}
         placeholder={placeholder}
         value={value ?? ""}
+        aria-labelledby={labelledBy}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
@@ -92,10 +181,12 @@ function LongTextInput({
   value,
   onChange,
   placeholder,
+  labelledBy,
 }: {
   value: string;
   onChange: (next: string) => void;
   placeholder?: string;
+  labelledBy?: string;
 }) {
   return (
     <div className="flex flex-col gap-3">
@@ -104,6 +195,7 @@ function LongTextInput({
         className={UNDERLINE_INPUT + " resize-none"}
         placeholder={placeholder ?? "Type your answer..."}
         value={value ?? ""}
+        aria-labelledby={labelledBy}
         onChange={(e) => onChange(e.target.value)}
       />
       <div className="flex items-center gap-2.5">
@@ -120,6 +212,7 @@ function OptionRow({
   selected,
   shape,
   disabled,
+  role,
   onSelect,
 }: {
   index: number;
@@ -127,12 +220,15 @@ function OptionRow({
   selected: boolean;
   shape: "circle" | "square";
   disabled?: boolean;
+  role: "radio" | "checkbox";
   onSelect: () => void;
 }) {
   return (
     <motion.button
       type="button"
       disabled={disabled}
+      role={role}
+      aria-checked={selected}
       onClick={onSelect}
       whileHover={disabled ? undefined : { x: 4 }}
       whileTap={disabled ? undefined : { scale: 0.985 }}
@@ -210,6 +306,7 @@ function OtherTextField({
         type="text"
         className="ml-10 w-[calc(100%-2.5rem)] border-b-2 border-neutral-300 bg-transparent px-0.5 pb-2 pt-3 text-sm text-neutral-900 outline-none transition-colors focus:border-neutral-900"
         placeholder="Tell us more..."
+        aria-label="Something else — please specify"
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {
@@ -231,6 +328,7 @@ function SingleSelectInput({
   onChange,
   onOtherChange,
   onAdvance,
+  labelledBy,
 }: {
   options: string[];
   allowOther?: boolean;
@@ -239,9 +337,11 @@ function SingleSelectInput({
   onChange: (next: string) => void;
   onOtherChange: (next: string) => void;
   onAdvance?: () => void;
+  labelledBy?: string;
 }) {
   const effectiveOptions = allowOther ? [...options, "Something else"] : options;
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -255,25 +355,17 @@ function SingleSelectInput({
     }
   }
 
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (isTypingTarget(document.activeElement)) return;
-      const idx = Number(e.key) - 1;
-      if (idx >= 0 && idx < effectiveOptions.length) handleSelect(effectiveOptions[idx]);
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveOptions.join("|")]);
+  useOptionShortcuts(effectiveOptions, handleSelect, containerRef);
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div ref={containerRef} role="radiogroup" aria-labelledby={labelledBy} className="flex flex-col gap-2.5">
       {effectiveOptions.map((option, index) => (
         <OptionRow
           key={option}
           index={index}
           label={option}
           shape="circle"
+          role="radio"
           selected={value === option}
           onSelect={() => handleSelect(option)}
         />
@@ -299,6 +391,7 @@ function MultiSelectInput({
   onChange,
   onOtherChange,
   onAdvance,
+  labelledBy,
 }: {
   options: string[];
   allowOther?: boolean;
@@ -308,10 +401,12 @@ function MultiSelectInput({
   onChange: (next: string[]) => void;
   onOtherChange: (next: string) => void;
   onAdvance?: () => void;
+  labelledBy?: string;
 }) {
   const effectiveOptions = allowOther ? [...options, "Something else"] : options;
   const selected = value ?? [];
   const atLimit = maxSelect !== undefined && selected.length >= maxSelect;
+  const containerRef = useRef<HTMLDivElement>(null);
 
   function toggle(option: string) {
     if (selected.includes(option)) {
@@ -321,21 +416,12 @@ function MultiSelectInput({
     }
   }
 
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if (isTypingTarget(document.activeElement)) return;
-      const idx = Number(e.key) - 1;
-      if (idx >= 0 && idx < effectiveOptions.length) toggle(effectiveOptions[idx]);
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveOptions.join("|"), selected.join("|"), atLimit]);
+  useOptionShortcuts(effectiveOptions, toggle, containerRef);
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div ref={containerRef} role="group" aria-labelledby={labelledBy} className="flex flex-col gap-2.5">
       {maxSelect && (
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-neutral-500" aria-live="polite">
           {selected.length}/{maxSelect} selected
         </p>
       )}
@@ -347,6 +433,7 @@ function MultiSelectInput({
             index={index}
             label={option}
             shape="square"
+            role="checkbox"
             selected={isChecked}
             disabled={!isChecked && atLimit}
             onSelect={() => toggle(option)}
@@ -398,6 +485,8 @@ function ScalePairsInput({
                 min={0}
                 max={100}
                 value={v}
+                aria-label={`${pair[0]} to ${pair[1]}`}
+                aria-valuetext={`${v} out of 100, closer to ${v >= 50 ? pair[1] : pair[0]}`}
                 onChange={(e) => onChange({ ...value, [index]: Number(e.target.value) })}
                 className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-neutral-200 accent-neutral-900"
               />
@@ -413,10 +502,12 @@ function UploadOrTextInput({
   value,
   onChange,
   placeholder,
+  labelledBy,
 }: {
   value: UploadOrTextValue;
   onChange: (next: UploadOrTextValue) => void;
   placeholder?: string;
+  labelledBy?: string;
 }) {
   const current = value ?? { text: "", files: [] };
   const [uploading, setUploading] = useState(false);
@@ -455,6 +546,7 @@ function UploadOrTextInput({
         className={UNDERLINE_INPUT + " resize-none"}
         placeholder={placeholder ?? "Paste links or describe it here..."}
         value={current.text}
+        aria-labelledby={labelledBy}
         onChange={(e) => onChange({ ...current, text: e.target.value })}
       />
       <div className="flex flex-wrap items-center gap-3">
@@ -477,7 +569,11 @@ function UploadOrTextInput({
           onTranscript={(text) => onChange({ ...current, text: current.text ? `${current.text} ${text}` : text })}
         />
       </div>
-      {uploadError && <p className="text-sm text-red-600">{uploadError}</p>}
+      {uploadError && (
+        <p className="text-sm text-red-600" role="alert">
+          {uploadError}
+        </p>
+      )}
       <AnimatePresence initial={false}>
         {current.files.length > 0 && (
           <motion.ul
@@ -518,6 +614,7 @@ function PartRenderer({
   onChange,
   onOtherChange,
   onAdvance,
+  headingId,
 }: {
   part: AnswerPart;
   value: unknown;
@@ -525,6 +622,7 @@ function PartRenderer({
   onChange: (next: unknown) => void;
   onOtherChange: (next: string) => void;
   onAdvance?: () => void;
+  headingId: string;
 }) {
   switch (part.kind) {
     case "fields":
@@ -542,10 +640,18 @@ function PartRenderer({
           onChange={onChange}
           placeholder={part.placeholder}
           onAdvance={onAdvance}
+          labelledBy={headingId}
         />
       );
     case "long-text":
-      return <LongTextInput value={(value as string) ?? ""} onChange={onChange} placeholder={part.placeholder} />;
+      return (
+        <LongTextInput
+          value={(value as string) ?? ""}
+          onChange={onChange}
+          placeholder={part.placeholder}
+          labelledBy={headingId}
+        />
+      );
     case "single-select":
       return (
         <SingleSelectInput
@@ -556,6 +662,7 @@ function PartRenderer({
           onChange={onChange}
           onOtherChange={onOtherChange}
           onAdvance={onAdvance}
+          labelledBy={headingId}
         />
       );
     case "multi-select":
@@ -569,6 +676,7 @@ function PartRenderer({
           onChange={onChange}
           onOtherChange={onOtherChange}
           onAdvance={onAdvance}
+          labelledBy={headingId}
         />
       );
     case "scale-pairs":
@@ -585,6 +693,7 @@ function PartRenderer({
           value={(value as UploadOrTextValue) ?? { text: "", files: [] }}
           onChange={onChange}
           placeholder={part.placeholder}
+          labelledBy={headingId}
         />
       );
   }
@@ -601,13 +710,21 @@ const teamItemVariants = {
 };
 
 export default function UnpauseIntakeForm() {
-  const [step, setStep] = useState<Step>({ kind: "intro" });
+  const [step, setStep] = useState<Step>(() => restoreStep(loadDraft()));
   const [direction, setDirection] = useState(1);
-  const [answers, setAnswers] = useState<AnswerStore>({});
+  const [answers, setAnswers] = useState<AnswerStore>(() => loadDraft()?.answers ?? {});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const slideRef = useRef<HTMLDivElement>(null);
   const shouldReduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ step, answers }));
+    } catch {
+      // Storage unavailable (private browsing, quota) — the draft just won't persist.
+    }
+  }, [step, answers]);
 
   function setAnswer(key: string, value: unknown) {
     setAnswers((prev) => ({ ...prev, [key]: value }));
@@ -641,6 +758,11 @@ export default function UnpauseIntakeForm() {
       if (!res.ok || !data.ok) {
         throw new Error(data.error ?? "submit_failed");
       }
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // ignore
+      }
       transitionTo({ kind: "done" });
     } catch {
       setSubmitError("Something went wrong sending your answers. Please try again.");
@@ -652,7 +774,7 @@ export default function UnpauseIntakeForm() {
   useEffect(() => {
     if (step.kind !== "slide") return;
     const el = slideRef.current?.querySelector<HTMLInputElement | HTMLTextAreaElement>(
-      "input[type=text], textarea",
+      "input[type=text], input[type=email], textarea",
     );
     const id = requestAnimationFrame(() => el?.focus({ preventScroll: true }));
     return () => cancelAnimationFrame(id);
@@ -668,6 +790,7 @@ export default function UnpauseIntakeForm() {
 
   const stepKey = step.kind === "slide" ? `slide-${step.index}` : step.kind;
   const slide = step.kind === "slide" ? SLIDES[step.index] : null;
+  const canAdvance = isSlideComplete(slide, answers);
   const showEnterHint = slide?.kind === "question" && slide.part.part.kind === "short-text";
 
   const slideVariants = {
@@ -797,6 +920,7 @@ export default function UnpauseIntakeForm() {
                             const helper = isMainPart ? question.helper : part.helper;
                             const key = keyFor(question.id, part.id);
                             const otherKey = `${key}__other`;
+                            const headingId = `heading-${key}`;
                             return (
                               <div className="flex flex-col gap-6">
                                 <div>
@@ -808,7 +932,7 @@ export default function UnpauseIntakeForm() {
                                       Following up: &ldquo;{question.prompt}&rdquo;
                                     </p>
                                   )}
-                                  <h2 className="mt-2 text-2xl font-medium text-neutral-900 sm:text-3xl">
+                                  <h2 id={headingId} className="mt-2 text-2xl font-medium text-neutral-900 sm:text-3xl">
                                     {heading}
                                   </h2>
                                   {helper && <p className="mt-2 text-neutral-500 leading-relaxed">{helper}</p>}
@@ -820,6 +944,7 @@ export default function UnpauseIntakeForm() {
                                   onChange={(v) => setAnswer(key, v)}
                                   onOtherChange={(v) => setAnswer(otherKey, v)}
                                   onAdvance={() => goTo(step.index + 1)}
+                                  headingId={headingId}
                                 />
                               </div>
                             );
@@ -848,7 +973,11 @@ export default function UnpauseIntakeForm() {
                     <p className="text-sm text-neutral-500">
                       You can go back to review or change any of your answers before submitting.
                     </p>
-                    {submitError && <p className="text-sm text-red-600">{submitError}</p>}
+                    {submitError && (
+                      <p className="text-sm text-red-600" role="alert">
+                        {submitError}
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -906,22 +1035,33 @@ export default function UnpauseIntakeForm() {
           <div className="mx-auto flex max-w-2xl items-center justify-between px-6 py-4 sm:px-10">
             <button
               type="button"
-              className="text-sm font-medium text-neutral-500 transition hover:text-neutral-900"
+              className="-m-2 p-2 text-sm font-medium text-neutral-500 transition hover:text-neutral-900"
               onClick={() => (step.kind === "slide" ? goTo(step.index - 1) : goTo(SLIDES.length - 1))}
             >
               ← Back
             </button>
             <div className="flex items-center gap-3">
-              {showEnterHint && (
+              {step.kind === "slide" && !canAdvance && (
+                <span className="hidden text-xs text-neutral-400 sm:inline">Name and email are required</span>
+              )}
+              {step.kind === "slide" && canAdvance && showEnterHint && (
                 <span className="hidden text-xs text-neutral-400 sm:inline">press Enter ↵</span>
               )}
               <motion.button
                 type="button"
-                disabled={step.kind === "review" && submitting}
-                whileHover={{ y: -2, boxShadow: "0 10px 25px -10px rgba(0,0,0,0.35)" }}
-                whileTap={{ scale: 0.97 }}
+                disabled={(step.kind === "review" && submitting) || (step.kind === "slide" && !canAdvance)}
+                whileHover={
+                  (step.kind === "review" && submitting) || (step.kind === "slide" && !canAdvance)
+                    ? undefined
+                    : { y: -2, boxShadow: "0 10px 25px -10px rgba(0,0,0,0.35)" }
+                }
+                whileTap={
+                  (step.kind === "review" && submitting) || (step.kind === "slide" && !canAdvance)
+                    ? undefined
+                    : { scale: 0.97 }
+                }
                 transition={{ type: "spring", stiffness: 400, damping: 26 }}
-                className="rounded-full bg-neutral-900 px-8 py-3 text-sm font-medium text-white disabled:opacity-50"
+                className="rounded-full bg-neutral-900 px-8 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
                 onClick={() => (step.kind === "review" ? handleSubmit() : goTo(step.index + 1))}
               >
                 {step.kind === "review"
