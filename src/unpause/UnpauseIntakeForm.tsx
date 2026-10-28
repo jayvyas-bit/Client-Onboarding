@@ -841,6 +841,14 @@ export default function UnpauseIntakeForm() {
 
   useEffect(() => {
     if (step.kind === "resume") return;
+    if (step.kind === "done") {
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // ignore
+      }
+      return;
+    }
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify({ step, answers }));
     } catch {
