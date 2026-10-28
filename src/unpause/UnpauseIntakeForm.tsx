@@ -831,7 +831,7 @@ export default function UnpauseIntakeForm() {
 
       <div className="relative z-10 flex min-h-dvh flex-col">
         <div className="flex flex-1 items-center justify-center px-6 py-20 sm:px-10">
-          <div className="w-full max-w-2xl">
+          <div className="w-full max-w-2xl rounded-3xl border border-neutral-900/5 bg-[#fffefb] p-8 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.15)] sm:p-12">
             <AnimatePresence mode="wait" custom={direction} initial={false}>
               <motion.div
                 key={stepKey}
