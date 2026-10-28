@@ -35,6 +35,28 @@ function isTypingTarget(el: Element | null): boolean {
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+const SECTION_ACCENTS = [
+  "#004ac7", // 01 Hello, you.
+  "#b5542c", // 02 The people on the other side.
+  "#4b6b3c", // 03 Your world, your rules.
+  "#7a4b8f", // 04 Let's talk about the logo.
+  "#1f6e6e", // 05 What we're working with.
+  "#9c6b1f", // 06 Making it real.
+  "#a13b5c", // 07 One last thing.
+];
+
+function wordCount(text: string): number {
+  const trimmed = text.trim();
+  return trimmed ? trimmed.split(/\s+/).length : 0;
+}
+
+function reactiveNote(words: number): string | null {
+  if (words === 0) return null;
+  if (words < 5) return "Good start.";
+  if (words < 40) return "Keep going, if there's more.";
+  return "This is exactly the kind of detail that helps.";
+}
+
 const DRAFT_KEY = "unpause-intake-draft-v1";
 
 function loadDraft(): { step: Step; answers: AnswerStore } | null {
@@ -230,6 +252,9 @@ function LongTextInput({
   placeholder?: string;
   labelledBy?: string;
 }) {
+  const shouldReduceMotion = useReducedMotion();
+  const note = reactiveNote(wordCount(value ?? ""));
+  const hintText = note ?? "Or tap to speak your answer";
   return (
     <div className="flex flex-col gap-3">
       <textarea
@@ -242,7 +267,22 @@ function LongTextInput({
       />
       <div className="flex items-center gap-2.5">
         <MicButton onTranscript={(text) => onChange(value ? `${value} ${text}` : text)} />
-        <span className="text-xs text-neutral-400">Or tap to speak your answer</span>
+        {shouldReduceMotion ? (
+          <span className="text-xs text-neutral-400">{hintText}</span>
+        ) : (
+          <AnimatePresence mode="wait">
+            <motion.span
+              key={hintText}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.25, ease: EASE }}
+              className="text-xs text-neutral-400"
+            >
+              {hintText}
+            </motion.span>
+          </AnimatePresence>
+        )}
       </div>
     </div>
   );
@@ -1034,42 +1074,56 @@ export default function UnpauseIntakeForm() {
                 {step.kind === "slide" &&
                   slide &&
                   (() => {
-                    const ordinal = QUESTION_ORDINALS[step.index];
+                    const accent = SECTION_ACCENTS[slide.sectionIndex % SECTION_ACCENTS.length];
                     return (
                       <div className="flex flex-col gap-8">
                         {slide.kind === "divider" ? (
-                          <div className="flex max-w-prose flex-col gap-4">
-                            <motion.div
-                              initial={{ height: 0 }}
-                              animate={{ height: 28 }}
-                              transition={{ duration: 0.55, ease: EASE }}
-                              className="w-0.5 rounded-full bg-neutral-900/30"
-                            />
-                            <motion.p
-                              variants={textItemVariants}
-                              className={EYEBROW_LABEL}
-                            >
-                              SECTION {slide.section.number} / {String(SECTIONS.length).padStart(2, "0")}
-                            </motion.p>
-                            <motion.h2
-                              variants={textItemVariants}
-                              className="text-3xl font-medium text-neutral-900 sm:text-4xl"
-                            >
-                              {slide.section.title}
-                            </motion.h2>
-                            <motion.p variants={textItemVariants} className="text-sm text-neutral-500">
-                              {slide.section.host}
-                            </motion.p>
-                            {slide.section.intro && (
-                              <motion.p variants={textItemVariants} className="text-neutral-600 leading-relaxed">
-                                {slide.section.intro}
+                          <div className="flex items-start justify-between gap-6">
+                            <div className="flex max-w-prose flex-col gap-4">
+                              <motion.div
+                                initial={{ height: 0 }}
+                                animate={{ height: 28 }}
+                                transition={{ duration: 0.55, ease: EASE }}
+                                className="w-0.5 rounded-full bg-neutral-900/30"
+                              />
+                              <motion.p
+                                variants={textItemVariants}
+                                className={EYEBROW_LABEL}
+                              >
+                                SECTION <AnimatedOrdinal value={slide.sectionIndex + 1} /> OF {SECTIONS.length}
                               </motion.p>
-                            )}
+                              <motion.h2
+                                variants={textItemVariants}
+                                className="text-3xl font-medium text-neutral-900 sm:text-4xl"
+                              >
+                                {slide.section.title}
+                              </motion.h2>
+                              <motion.p variants={textItemVariants} className="text-sm text-neutral-500">
+                                {slide.section.host}
+                              </motion.p>
+                              {slide.section.intro && (
+                                <motion.p variants={textItemVariants} className="text-neutral-600 leading-relaxed">
+                                  {slide.section.intro}
+                                </motion.p>
+                              )}
+                            </div>
+                            <motion.div
+                              aria-hidden="true"
+                              initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9, x: 16 }}
+                              animate={{ opacity: 0.1, scale: 1, x: 0 }}
+                              transition={{ duration: 0.7, ease: EASE, delay: 0.1 }}
+                              className="hidden shrink-0 select-none text-[7rem] font-semibold leading-none sm:block sm:text-[9rem]"
+                              style={{ color: accent }}
+                            >
+                              {String(slide.sectionIndex + 1).padStart(2, "0")}
+                            </motion.div>
                           </div>
                         ) : (
                           (() => {
                             const { question } = slide;
                             const mainHeadingId = `heading-${question.id}`;
+                            const posInSection = slide.section.questions.findIndex((q) => q.id === question.id);
+                            const remainingInSection = slide.section.questions.length - posInSection - 1;
                             return (
                               <div className="flex flex-col gap-8">
                                 <div className="max-w-prose">
@@ -1077,7 +1131,16 @@ export default function UnpauseIntakeForm() {
                                     variants={textItemVariants}
                                     className={EYEBROW_LABEL}
                                   >
-                                    QUESTION <AnimatedOrdinal value={ordinal} /> OF {TOTAL_QUESTIONS}
+                                    SECTION <AnimatedOrdinal value={slide.sectionIndex + 1} /> OF {SECTIONS.length}
+                                    {" · "}
+                                    {remainingInSection === 0 ? (
+                                      "last question in this section"
+                                    ) : (
+                                      <>
+                                        <AnimatedOrdinal value={remainingInSection} />{" "}
+                                        {remainingInSection === 1 ? "question" : "questions"} left here
+                                      </>
+                                    )}
                                   </motion.p>
                                   <motion.h2
                                     variants={textItemVariants}
