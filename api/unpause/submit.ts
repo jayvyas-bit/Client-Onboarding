@@ -2,8 +2,10 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { sql } from "../_lib/db.js";
 import { randomUUID } from "node:crypto";
 import { buildSubmissionPdf } from "../_lib/pdf.js";
-import { sendSubmissionNotification } from "../_lib/email.js";
+import { uploadSubmissionPdfToDrive } from "../_lib/drive.js";
 import { generateSmartAnalysis } from "../_lib/analyze.js";
+
+export const config = { maxDuration: 60 };
 
 async function ensureTable() {
   await sql`
@@ -43,8 +45,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const typedAnswers = answers as Record<string, unknown>;
     const analysis = await generateSmartAnalysis(typedAnswers);
     const pdfBuffer = await buildSubmissionPdf({ id, submittedAt, answers: typedAnswers, analysis });
-    await sendSubmissionNotification({ id, submittedAt, answers: typedAnswers }, pdfBuffer);
+    await uploadSubmissionPdfToDrive({ id, submittedAt, answers: typedAnswers }, pdfBuffer);
   } catch (err) {
-    console.error("submit: PDF/email notification failed", err);
+    console.error("submit: PDF/Drive upload failed", err);
   }
 }

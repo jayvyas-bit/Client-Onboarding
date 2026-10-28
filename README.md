@@ -32,10 +32,12 @@ Postgres database via `api/_lib/db.ts`:
 | --- | --- | --- |
 | `SUPABASE_DB_URL` | DB access | Postgres connection string |
 | `BLOB_READ_WRITE_TOKEN` | File uploads | Vercel Blob store token |
-| `RESEND_API_KEY` | Submission email | From a [Resend](https://resend.com) account |
-| `NOTIFICATION_EMAIL_FROM` | Submission email | Must be a verified sending address/domain in Resend |
-| `NOTIFICATION_EMAIL_TO` | Submission email | Where the submission PDF gets sent |
+| `GOOGLE_OAUTH_CLIENT_ID` | Submission PDF delivery | OAuth 2.0 client ID (Desktop app type) from Google Cloud Console |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | Submission PDF delivery | OAuth 2.0 client secret paired with the client ID |
+| `GOOGLE_OAUTH_REFRESH_TOKEN` | Submission PDF delivery | Long-lived refresh token for the Google account that owns the uploads (obtained via a one-time consent flow) |
+| `GOOGLE_DRIVE_FOLDER_ID` | Submission PDF delivery | ID of the Drive folder (owned by, or shared as Editor with, the OAuth-authorized account) to upload PDFs into |
+| `NOTIFICATION_EMAIL_TO` | Submission PDF delivery | Google account to notify (Drive's native share-notification email) when a new PDF is uploaded |
 
-If the email variables are unset, submissions still save to the database — the PDF/email step is
+If the Drive variables are unset, submissions still save to the database — the PDF/upload step is
 skipped with a warning instead of failing the request. Set these in the Vercel project dashboard
 (Settings → Environment Variables).
