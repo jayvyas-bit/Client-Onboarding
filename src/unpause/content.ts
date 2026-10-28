@@ -16,32 +16,10 @@ function wantsLogoWork(answers: Record<string, unknown>): boolean {
 export const INTRO = {
   eyebrow: "THE UNBRIEF",
   title: "A little about you. A lot about what could be.",
-  body: [
-    "Before we make anything, we'd love to get to know you, your world, and what you're imagining.",
-    "Some questions are practical. Some are a little unexpected. All of them help us understand what we're making, why it matters, and how to make it work for you.",
-    "You don't need design terminology, a finished strategy, or perfectly thought-out answers. We appreciate a strong opinion, an unfinished thought, and a good reference equally.",
-    "Think of this as the beginning of a conversation, not a test.",
-  ],
-  time: "About 10–15 minutes. Take longer if you feel like exploring.",
-  team: [
-    {
-      name: "Vera",
-      role: "Strategy & Projects",
-      line: "She gets to the point, including the practical bits.",
-    },
-    {
-      name: "Iris",
-      role: "Design & Experience",
-      line: "He has an eye for what you mean, even when you don't have the words for it.",
-    },
-    {
-      name: "Dex",
-      role: "Development & Systems",
-      line: "She asks the questions now that nobody wants to debug later.",
-    },
-  ],
+  body: "Before we make anything, we'd love to get to know you, your world, and what you're imagining. No design terminology, no finished strategy, no perfectly tidy answers needed. A strong opinion and a good reference are plenty, and this is a conversation, not a test.",
+  time: "About 10–15 minutes.",
   teamNote:
-    "They're AI agents created by Unpause to make our first conversation more useful. Our human team will review what you share.",
+    "You'll hear from Vera, Iris, and Dex, our AI team, built to make this first conversation useful. A human reviews everything you share.",
 };
 
 export const THANK_YOU = {

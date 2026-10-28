@@ -490,9 +490,6 @@ function SingleSelectInput({
           <OtherTextField value={otherValue} onChange={onOtherChange} onAdvance={onAdvance} />
         )}
       </AnimatePresence>
-      {effectiveOptions.length <= 9 && (
-        <p className="pt-1 text-xs text-neutral-400">Tip: press a number key to jump ahead</p>
-      )}
     </div>
   );
 }
@@ -560,9 +557,6 @@ function MultiSelectInput({
           <OtherTextField value={otherValue} onChange={onOtherChange} onAdvance={onAdvance} />
         )}
       </AnimatePresence>
-      {effectiveOptions.length <= 9 && (
-        <p className="pt-1 text-xs text-neutral-400">Tip: press a number key to toggle an option</p>
-      )}
     </div>
   );
 }
@@ -814,16 +808,6 @@ function PartRenderer({
   }
 }
 
-const teamContainerVariants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.08, delayChildren: 0.15 } },
-};
-
-const teamItemVariants = {
-  hidden: { opacity: 0, y: 10 },
-  show: { opacity: 1, y: 0 },
-};
-
 export default function UnpauseIntakeForm() {
   const [step, setStep] = useState<Step>(() => {
     const draft = loadDraft();
@@ -1037,40 +1021,13 @@ export default function UnpauseIntakeForm() {
                       >
                         {INTRO.title}
                       </motion.h1>
-                      <div className="mt-4 flex flex-col gap-4">
-                        {INTRO.body.map((p) => (
-                          <motion.p key={p} variants={textItemVariants} className="text-neutral-600 leading-relaxed">
-                            {p}
-                          </motion.p>
-                        ))}
-                      </div>
-                      <motion.p variants={textItemVariants} className="mt-4 text-sm text-neutral-500">
-                        {INTRO.time}
+                      <motion.p variants={textItemVariants} className="mt-4 text-neutral-600 leading-relaxed">
+                        {INTRO.body}
+                      </motion.p>
+                      <motion.p variants={textItemVariants} className="mt-3 text-sm text-neutral-500">
+                        {INTRO.time} {INTRO.teamNote}
                       </motion.p>
                     </div>
-
-                    <motion.div
-                      variants={teamContainerVariants}
-                      initial="hidden"
-                      animate="show"
-                      className="mt-4 grid gap-4 sm:grid-cols-3"
-                    >
-                      {INTRO.team.map((member) => (
-                        <motion.div
-                          key={member.name}
-                          variants={teamItemVariants}
-                          transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                          className="rounded-xl border border-neutral-200 bg-white/70 p-4 shadow-sm"
-                        >
-                          <p className="font-medium text-neutral-900">{member.name}</p>
-                          <p className="text-xs text-neutral-500">{member.role}</p>
-                          <p className="mt-2 text-sm text-neutral-600">{member.line}</p>
-                        </motion.div>
-                      ))}
-                    </motion.div>
-                    <motion.p variants={textItemVariants} className="text-sm italic text-neutral-500">
-                      {INTRO.teamNote}
-                    </motion.p>
 
                     <motion.button
                       type="button"
@@ -1148,14 +1105,12 @@ export default function UnpauseIntakeForm() {
                                     variants={textItemVariants}
                                     className={EYEBROW_LABEL}
                                   >
-                                    SECTION <AnimatedOrdinal value={slide.sectionIndex + 1} /> OF {activeSections.length}
-                                    {" · "}
                                     {remainingInSection === 0 ? (
                                       "last question in this section"
                                     ) : (
                                       <>
                                         <AnimatedOrdinal value={remainingInSection} />{" "}
-                                        {remainingInSection === 1 ? "question" : "questions"} left here
+                                        {remainingInSection === 1 ? "question" : "questions"} left in this section
                                       </>
                                     )}
                                   </motion.p>
