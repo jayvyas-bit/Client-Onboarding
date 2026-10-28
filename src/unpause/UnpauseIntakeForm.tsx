@@ -832,9 +832,20 @@ export default function UnpauseIntakeForm() {
   const slideVariants = {
     enter: (dir: number) =>
       shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: dir >= 0 ? 32 : -32 },
-    center: { opacity: 1, x: 0 },
+    center: {
+      opacity: 1,
+      x: 0,
+      transition: shouldReduceMotion
+        ? { duration: 0.4, ease: EASE }
+        : { duration: 0.4, ease: EASE, staggerChildren: 0.06, delayChildren: 0.08 },
+    },
     exit: (dir: number) =>
       shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: dir >= 0 ? -32 : 32 },
+  };
+
+  const textItemVariants = {
+    enter: shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 },
+    center: { opacity: 1, y: 0, transition: { duration: 0.45, ease: EASE } },
   };
 
   return (
@@ -883,16 +894,28 @@ export default function UnpauseIntakeForm() {
                 {step.kind === "intro" && (
                   <div className="flex flex-col gap-6">
                     <div className="max-w-prose">
-                      <p className="text-xs font-medium tracking-[0.2em] text-neutral-400">{INTRO.eyebrow}</p>
-                      <h1 className="mt-2 text-3xl font-medium text-neutral-900 sm:text-4xl">{INTRO.title}</h1>
+                      <motion.p
+                        variants={textItemVariants}
+                        className="text-xs font-medium tracking-[0.2em] text-neutral-400"
+                      >
+                        {INTRO.eyebrow}
+                      </motion.p>
+                      <motion.h1
+                        variants={textItemVariants}
+                        className="mt-2 text-3xl font-medium text-neutral-900 sm:text-4xl"
+                      >
+                        {INTRO.title}
+                      </motion.h1>
                       <div className="mt-4 flex flex-col gap-4">
                         {INTRO.body.map((p) => (
-                          <p key={p} className="text-neutral-600 leading-relaxed">
+                          <motion.p key={p} variants={textItemVariants} className="text-neutral-600 leading-relaxed">
                             {p}
-                          </p>
+                          </motion.p>
                         ))}
                       </div>
-                      <p className="mt-4 text-sm text-neutral-500">{INTRO.time}</p>
+                      <motion.p variants={textItemVariants} className="mt-4 text-sm text-neutral-500">
+                        {INTRO.time}
+                      </motion.p>
                     </div>
 
                     <motion.div
@@ -915,10 +938,13 @@ export default function UnpauseIntakeForm() {
                         </motion.div>
                       ))}
                     </motion.div>
-                    <p className="text-sm italic text-neutral-500">{INTRO.teamNote}</p>
+                    <motion.p variants={textItemVariants} className="text-sm italic text-neutral-500">
+                      {INTRO.teamNote}
+                    </motion.p>
 
                     <motion.button
                       type="button"
+                      variants={textItemVariants}
                       whileHover={{ y: -2, boxShadow: "0 12px 30px rgba(0,0,0,0.14)" }}
                       whileTap={{ scale: 0.97 }}
                       transition={{ type: "spring", stiffness: 400, damping: 26 }}
@@ -944,15 +970,25 @@ export default function UnpauseIntakeForm() {
                               transition={{ duration: 0.4, ease: EASE }}
                               className="w-0.5 rounded-full bg-neutral-900/30"
                             />
-                            <p className="text-xs font-medium tracking-[0.2em] text-neutral-400">
+                            <motion.p
+                              variants={textItemVariants}
+                              className="text-xs font-medium tracking-[0.2em] text-neutral-400"
+                            >
                               SECTION {slide.section.number} / {String(SECTIONS.length).padStart(2, "0")}
-                            </p>
-                            <h2 className="text-3xl font-medium text-neutral-900 sm:text-4xl">
+                            </motion.p>
+                            <motion.h2
+                              variants={textItemVariants}
+                              className="text-3xl font-medium text-neutral-900 sm:text-4xl"
+                            >
                               {slide.section.title}
-                            </h2>
-                            <p className="text-sm text-neutral-500">{slide.section.host}</p>
+                            </motion.h2>
+                            <motion.p variants={textItemVariants} className="text-sm text-neutral-500">
+                              {slide.section.host}
+                            </motion.p>
                             {slide.section.intro && (
-                              <p className="text-neutral-600 leading-relaxed">{slide.section.intro}</p>
+                              <motion.p variants={textItemVariants} className="text-neutral-600 leading-relaxed">
+                                {slide.section.intro}
+                              </motion.p>
                             )}
                           </div>
                         ) : (
@@ -962,17 +998,26 @@ export default function UnpauseIntakeForm() {
                             return (
                               <div className="flex flex-col gap-8">
                                 <div className="max-w-prose">
-                                  <p className="text-xs font-medium tracking-[0.2em] text-neutral-400">
+                                  <motion.p
+                                    variants={textItemVariants}
+                                    className="text-xs font-medium tracking-[0.2em] text-neutral-400"
+                                  >
                                     QUESTION <AnimatedOrdinal value={ordinal} /> OF {TOTAL_QUESTIONS}
-                                  </p>
-                                  <h2
+                                  </motion.p>
+                                  <motion.h2
+                                    variants={textItemVariants}
                                     id={mainHeadingId}
                                     className="mt-2 text-2xl font-medium text-neutral-900 sm:text-3xl"
                                   >
                                     {question.prompt}
-                                  </h2>
+                                  </motion.h2>
                                   {question.helper && (
-                                    <p className="mt-2 text-neutral-500 leading-relaxed">{question.helper}</p>
+                                    <motion.p
+                                      variants={textItemVariants}
+                                      className="mt-2 text-neutral-500 leading-relaxed"
+                                    >
+                                      {question.helper}
+                                    </motion.p>
                                   )}
                                 </div>
                                 {question.parts.map((part, i) => {
@@ -981,8 +1026,9 @@ export default function UnpauseIntakeForm() {
                                   const isLast = i === question.parts.length - 1;
                                   const partHeadingId = i === 0 ? mainHeadingId : `heading-${key}`;
                                   return (
-                                    <div
+                                    <motion.div
                                       key={part.id}
+                                      variants={textItemVariants}
                                       className={
                                         i > 0
                                           ? "flex flex-col gap-4 border-t border-neutral-900/10 pt-6"
@@ -1008,7 +1054,7 @@ export default function UnpauseIntakeForm() {
                                         onAdvance={isLast ? () => goTo(step.index + 1) : undefined}
                                         headingId={partHeadingId}
                                       />
-                                    </div>
+                                    </motion.div>
                                   );
                                 })}
                               </div>
@@ -1021,12 +1067,22 @@ export default function UnpauseIntakeForm() {
 
                 {step.kind === "review" && (
                   <div className="flex flex-col gap-6">
-                    <p className="text-xs font-medium tracking-[0.2em] text-neutral-400">BEFORE YOU GO.</p>
-                    <h2 className="text-2xl font-medium text-neutral-900 sm:text-3xl">One last look.</h2>
-                    <p className="text-neutral-600 leading-relaxed">
+                    <motion.p
+                      variants={textItemVariants}
+                      className="text-xs font-medium tracking-[0.2em] text-neutral-400"
+                    >
+                      BEFORE YOU GO.
+                    </motion.p>
+                    <motion.h2
+                      variants={textItemVariants}
+                      className="text-2xl font-medium text-neutral-900 sm:text-3xl"
+                    >
+                      One last look.
+                    </motion.h2>
+                    <motion.p variants={textItemVariants} className="text-neutral-600 leading-relaxed">
                       Here's a summary of what you've shared with us:
-                    </p>
-                    <ul className="list-disc pl-5 text-neutral-600">
+                    </motion.p>
+                    <motion.ul variants={textItemVariants} className="list-disc pl-5 text-neutral-600">
                       <li>Your brand and what you do</li>
                       <li>What you're looking to create</li>
                       <li>What matters most</li>
@@ -1034,14 +1090,14 @@ export default function UnpauseIntakeForm() {
                       <li>What you'll need delivered</li>
                       <li>Your preferred timeline</li>
                       <li>Your investment range and budget ceiling</li>
-                    </ul>
-                    <p className="text-sm text-neutral-500">
+                    </motion.ul>
+                    <motion.p variants={textItemVariants} className="text-sm text-neutral-500">
                       You can go back to review or change any of your answers before submitting.
-                    </p>
+                    </motion.p>
                     {submitError && (
-                      <p className="text-sm text-red-600" role="alert">
+                      <motion.p variants={textItemVariants} className="text-sm text-red-600" role="alert">
                         {submitError}
-                      </p>
+                      </motion.p>
                     )}
                   </div>
                 )}
@@ -1077,16 +1133,29 @@ export default function UnpauseIntakeForm() {
                         transition={{ duration: 0.4, delay: 0.5, ease: EASE }}
                       />
                     </motion.svg>
-                    <p className="text-xs font-medium tracking-[0.2em] text-neutral-400">THANK YOU.</p>
-                    <h2 className="text-2xl font-medium text-neutral-900">{THANK_YOU.title}</h2>
+                    <motion.p
+                      variants={textItemVariants}
+                      className="text-xs font-medium tracking-[0.2em] text-neutral-400"
+                    >
+                      THANK YOU.
+                    </motion.p>
+                    <motion.h2 variants={textItemVariants} className="text-2xl font-medium text-neutral-900">
+                      {THANK_YOU.title}
+                    </motion.h2>
                     {THANK_YOU.body.map((p) => (
-                      <p key={p} className="text-neutral-600 leading-relaxed">
+                      <motion.p key={p} variants={textItemVariants} className="text-neutral-600 leading-relaxed">
                         {p}
-                      </p>
+                      </motion.p>
                     ))}
-                    <p className="mt-2 font-medium text-neutral-900">{THANK_YOU.cta}</p>
-                    <p className="text-sm text-neutral-500">{THANK_YOU.signoff}</p>
-                    <p className="mt-6 text-sm tracking-wide text-neutral-400">— Unpause</p>
+                    <motion.p variants={textItemVariants} className="mt-2 font-medium text-neutral-900">
+                      {THANK_YOU.cta}
+                    </motion.p>
+                    <motion.p variants={textItemVariants} className="text-sm text-neutral-500">
+                      {THANK_YOU.signoff}
+                    </motion.p>
+                    <motion.p variants={textItemVariants} className="mt-6 text-sm tracking-wide text-neutral-400">
+                      — Unpause
+                    </motion.p>
                   </div>
                 )}
               </motion.div>
