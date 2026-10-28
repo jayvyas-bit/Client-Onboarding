@@ -1212,66 +1212,87 @@ export default function UnpauseIntakeForm() {
                   })()}
 
                 {step.kind === "review" && (
-                  <div className="flex flex-col gap-6">
-                    <motion.p variants={textItemVariants} className={EYEBROW_LABEL}>
-                      BEFORE YOU GO.
-                    </motion.p>
-                    <motion.h2
-                      variants={textItemVariants}
-                      className="text-2xl font-medium text-neutral-900 sm:text-3xl"
-                    >
-                      One last look.
-                    </motion.h2>
-                    <motion.p variants={textItemVariants} className="text-neutral-600 leading-relaxed">
-                      Here's what you've shared with us so far:
-                    </motion.p>
-                    <motion.div variants={textItemVariants} className="flex flex-col gap-5">
-                      {reviewSections.map(({ section, items }, i) => (
-                        <div
-                          key={section.id}
-                          className={
-                            i > 0
-                              ? "flex flex-col gap-2.5 border-t border-neutral-900/10 pt-5"
-                              : "flex flex-col gap-2.5"
-                          }
-                        >
-                          <h3 className="text-xs font-semibold uppercase tracking-wide text-[#004ac7]">
-                            {section.title}
-                          </h3>
-                          <dl className="flex flex-col gap-1">
-                            {items.map((item, j) => (
-                              <motion.div
-                                key={j}
-                                role="button"
-                                tabIndex={0}
-                                onClick={() => goTo(item.slideIndex)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" || e.key === " ") {
-                                    e.preventDefault();
-                                    goTo(item.slideIndex);
-                                  }
-                                }}
-                                whileHover={{ x: 3 }}
-                                whileTap={{ scale: 0.99 }}
-                                transition={{ type: "spring", stiffness: 500, damping: 32 }}
-                                className="group -mx-3 flex cursor-pointer flex-col gap-0.5 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-[#004ac7]/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#004ac7] sm:flex-row sm:items-baseline sm:justify-between sm:gap-3"
-                              >
-                                <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
-                                  <dt className="text-sm text-neutral-500 sm:w-56 sm:shrink-0">{item.label}</dt>
-                                  <dd className="text-sm font-medium text-neutral-800">{item.display}</dd>
-                                </div>
-                                <span className="shrink-0 text-xs font-medium text-[#004ac7] opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                                  Edit →
-                                </span>
-                              </motion.div>
-                            ))}
-                          </dl>
-                        </div>
-                      ))}
+                  <div className="flex flex-col gap-10">
+                    <div className="max-w-prose">
+                      <motion.p variants={textItemVariants} className={EYEBROW_LABEL}>
+                        BEFORE YOU GO.
+                      </motion.p>
+                      <motion.h2
+                        variants={textItemVariants}
+                        className="mt-2 text-2xl font-medium text-neutral-900 sm:text-3xl"
+                      >
+                        Everything, in one place.
+                      </motion.h2>
+                      <motion.p variants={textItemVariants} className="mt-3 text-neutral-600 leading-relaxed">
+                        {totalQuestions} questions across {reviewSections.length}{" "}
+                        {reviewSections.length === 1 ? "section" : "sections"} — here's what you told us. Tap
+                        anything below to change it.
+                      </motion.p>
+                    </div>
+
+                    <motion.div variants={textItemVariants} className="flex flex-col gap-9">
+                      {reviewSections.map(({ section, items }) => {
+                        const trueIndex = activeSections.findIndex((s) => s.id === section.id);
+                        const accent = SECTION_ACCENTS[trueIndex % SECTION_ACCENTS.length];
+                        return (
+                          <div key={section.id} className="flex flex-col gap-3">
+                            <div className="flex items-baseline gap-2.5">
+                              <span className="text-xs font-semibold tabular-nums" style={{ color: accent }}>
+                                {String(trueIndex + 1).padStart(2, "0")}
+                              </span>
+                              <h3 className="text-xs font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                                {section.title}
+                              </h3>
+                            </div>
+                            <dl className="flex flex-col">
+                              {items.map((item, j) => (
+                                <motion.div
+                                  key={j}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => goTo(item.slideIndex)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.preventDefault();
+                                      goTo(item.slideIndex);
+                                    }
+                                  }}
+                                  whileHover={{ x: 3 }}
+                                  whileTap={{ scale: 0.99 }}
+                                  transition={{ type: "spring", stiffness: 500, damping: 32 }}
+                                  className="group -mx-3 flex cursor-pointer items-start justify-between gap-4 border-b border-neutral-900/[0.06] px-3 py-3 text-left transition-colors last:border-b-0 hover:bg-neutral-900/[0.035] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+                                >
+                                  <div className="flex flex-col gap-1">
+                                    <dt className="text-[11px] font-medium uppercase tracking-[0.12em] text-neutral-400">
+                                      {item.label}
+                                    </dt>
+                                    <dd className="text-[15px] font-medium leading-snug text-neutral-800">
+                                      {item.display}
+                                    </dd>
+                                  </div>
+                                  <svg
+                                    aria-hidden="true"
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="mt-1 shrink-0 text-neutral-300 opacity-60 transition-all group-hover:translate-x-0.5 group-hover:text-neutral-900 group-hover:opacity-100 group-focus-visible:opacity-100"
+                                  >
+                                    <path d="M12 20h9" />
+                                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                                  </svg>
+                                </motion.div>
+                              ))}
+                            </dl>
+                          </div>
+                        );
+                      })}
                     </motion.div>
-                    <motion.p variants={textItemVariants} className="text-sm text-neutral-500">
-                      Tap any answer above to jump back and change it before submitting.
-                    </motion.p>
+
                     {submitError && (
                       <motion.p variants={textItemVariants} className="text-sm text-red-600" role="alert">
                         {submitError}
