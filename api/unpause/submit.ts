@@ -3,6 +3,7 @@ import { sql } from "../_lib/db.js";
 import { randomUUID } from "node:crypto";
 import { buildSubmissionPdf } from "../_lib/pdf.js";
 import { sendSubmissionNotification } from "../_lib/email.js";
+import { generateSmartAnalysis } from "../_lib/analyze.js";
 
 async function ensureTable() {
   await sql`
@@ -39,8 +40,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.status(200).json({ ok: true, id });
 
   try {
-    const pdfBuffer = await buildSubmissionPdf({ id, submittedAt, answers: answers as Record<string, unknown> });
-    await sendSubmissionNotification({ id, submittedAt, answers: answers as Record<string, unknown> }, pdfBuffer);
+    const typedAnswers = answers as Record<string, unknown>;
+    const analysis = await generateSmartAnalysis(typedAnswers);
+    const pdfBuffer = await buildSubmissionPdf({ id, submittedAt, answers: typedAnswers, analysis });
+    await sendSubmissionNotification({ id, submittedAt, answers: typedAnswers }, pdfBuffer);
   } catch (err) {
     console.error("submit: PDF/email notification failed", err);
   }

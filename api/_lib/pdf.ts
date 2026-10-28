@@ -6,6 +6,7 @@ interface SubmissionForPdf {
   id: string;
   submittedAt: string;
   answers: Record<string, unknown>;
+  analysis?: string | null;
 }
 
 export function buildSubmissionPdf(submission: SubmissionForPdf): Promise<Buffer> {
@@ -25,6 +26,13 @@ export function buildSubmissionPdf(submission: SubmissionForPdf): Promise<Buffer
       .text(submission.id)
       .fillColor("#000000");
     doc.moveDown(1.5);
+
+    if (submission.analysis) {
+      doc.font("Helvetica-Bold").fontSize(13).fillColor("#000000").text("AI SNAPSHOT — FOR THE TEAM");
+      doc.moveDown(0.5);
+      doc.font("Helvetica").fontSize(10).fillColor("#333333").text(submission.analysis, { lineGap: 2 });
+      doc.fillColor("#000000").moveDown(1.5);
+    }
 
     for (const section of SECTIONS) {
       if (section.condition && !section.condition(submission.answers)) continue;
