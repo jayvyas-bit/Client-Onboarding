@@ -16,24 +16,32 @@ export interface QuestionSlide {
 
 export type Slide = DividerSlide | QuestionSlide;
 
-export const SLIDES: Slide[] = SECTIONS.flatMap((section, sectionIndex) => [
-  { kind: "divider", section, sectionIndex } satisfies DividerSlide,
-  ...section.questions.map(
-    (question): QuestionSlide => ({
-      kind: "question",
-      section,
-      sectionIndex,
-      question,
-    }),
-  ),
-]);
+export function getActiveSections(answers: Record<string, unknown>): SectionSpec[] {
+  return SECTIONS.filter((section) => !section.condition || section.condition(answers));
+}
 
-export const QUESTION_ORDINALS: number[] = (() => {
+export function buildSlides(sections: SectionSpec[]): Slide[] {
+  return sections.flatMap((section, sectionIndex) => [
+    { kind: "divider", section, sectionIndex } satisfies DividerSlide,
+    ...section.questions.map(
+      (question): QuestionSlide => ({
+        kind: "question",
+        section,
+        sectionIndex,
+        question,
+      }),
+    ),
+  ]);
+}
+
+export function getQuestionOrdinals(slides: Slide[]): number[] {
   let count = 0;
-  return SLIDES.map((slide) => {
+  return slides.map((slide) => {
     if (slide.kind === "question") count += 1;
     return count;
   });
-})();
+}
 
-export const TOTAL_QUESTIONS = QUESTION_ORDINALS[QUESTION_ORDINALS.length - 1] ?? 0;
+export function getTotalQuestions(questionOrdinals: number[]): number {
+  return questionOrdinals[questionOrdinals.length - 1] ?? 0;
+}

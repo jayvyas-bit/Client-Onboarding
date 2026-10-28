@@ -1,5 +1,18 @@
 import type { SectionSpec } from "./types";
 
+const LOGO_RELEVANT_OPTIONS = [
+  "A new logo",
+  "Refreshing or redesigning an existing logo",
+  "A complete brand identity (logo, colors, typography, visual direction)",
+  "I'm not entirely sure what I need yet",
+];
+
+function wantsLogoWork(answers: Record<string, unknown>): boolean {
+  const selected = answers["q4.main"];
+  if (!Array.isArray(selected) || selected.length === 0) return true;
+  return selected.some((option) => LOGO_RELEVANT_OPTIONS.includes(option));
+}
+
 export const INTRO = {
   eyebrow: "THE UNBRIEF",
   title: "A little about you. A lot about what could be.",
@@ -307,6 +320,7 @@ export const SECTIONS: SectionSpec[] = [
     host: "With Iris",
     intro:
       "Now we're getting into the good stuff. A logo has a fairly small job description for something expected to represent an entire brand. Let's make sure we understand where it needs to work, what it needs to say, and what it doesn't need to explain.",
+    condition: wantsLogoWork,
     questions: [
       {
         id: "q15",

@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "motion/react";
 import { upload } from "@vercel/blob/client";
-import { INTRO, SECTIONS, THANK_YOU } from "./content";
-import { QUESTION_ORDINALS, SLIDES, TOTAL_QUESTIONS } from "./flow";
+import { INTRO, THANK_YOU } from "./content";
+import { buildSlides, getActiveSections, getQuestionOrdinals, getTotalQuestions } from "./flow";
 import type { Slide } from "./flow";
 import MicButton from "./MicButton";
 import type { AnswerPart, FieldSpec, UploadOrTextValue } from "./types";
@@ -22,11 +22,11 @@ function keyFor(questionId: string, partId: string) {
   return `${questionId}.${partId}`;
 }
 
-function stepPosition(step: Step): number {
+function stepPosition(step: Step, slideCount: number): number {
   if (step.kind === "intro") return -1;
   if (step.kind === "slide") return step.index;
-  if (step.kind === "review") return SLIDES.length;
-  return SLIDES.length + 1;
+  if (step.kind === "review") return slideCount;
+  return slideCount + 1;
 }
 
 function isTypingTarget(el: Element | null): boolean {
@@ -71,13 +71,13 @@ function loadDraft(): { step: Step; answers: AnswerStore } | null {
   }
 }
 
-function restoreStep(draft: { step: Step; answers: AnswerStore } | null): Step {
+function restoreStep(draft: { step: Step; answers: AnswerStore } | null, slideCount: number): Step {
   const s = draft?.step;
   if (!s || typeof s !== "object" || typeof (s as { kind?: unknown }).kind !== "string") {
     return { kind: "intro" };
   }
   if (s.kind === "slide" && typeof (s as { index?: unknown }).index === "number") {
-    const maxIndex = Math.max(SLIDES.length - 1, 0);
+    const maxIndex = Math.max(slideCount - 1, 0);
     return { kind: "slide", index: Math.min(Math.max((s as { index: number }).index, 0), maxIndex) };
   }
   if (s.kind === "intro" || s.kind === "review" || s.kind === "done") return s;
@@ -824,9 +824,17 @@ const teamItemVariants = {
 };
 
 export default function UnpauseIntakeForm() {
-  const [step, setStep] = useState<Step>(() => restoreStep(loadDraft()));
+  const [step, setStep] = useState<Step>(() => {
+    const draft = loadDraft();
+    const initialSlideCount = buildSlides(getActiveSections(draft?.answers ?? {})).length;
+    return restoreStep(draft, initialSlideCount);
+  });
   const [direction, setDirection] = useState(1);
   const [answers, setAnswers] = useState<AnswerStore>(() => loadDraft()?.answers ?? {});
+  const activeSections = useMemo(() => getActiveSections(answers), [answers]);
+  const slides = useMemo(() => buildSlides(activeSections), [activeSections]);
+  const questionOrdinals = useMemo(() => getQuestionOrdinals(slides), [slides]);
+  const totalQuestions = useMemo(() => getTotalQuestions(questionOrdinals), [questionOrdinals]);
   const [submitting, setSubmitting] = useState(false);
   const [submitSucceeded, setSubmitSucceeded] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -847,14 +855,14 @@ export default function UnpauseIntakeForm() {
   }
 
   function transitionTo(next: Step) {
-    setDirection(stepPosition(next) >= stepPosition(step) ? 1 : -1);
+    setDirection(stepPosition(next, slides.length) >= stepPosition(step, slides.length) ? 1 : -1);
     setStep(next);
   }
 
   function goTo(index: number) {
     if (index < 0) {
       transitionTo({ kind: "intro" });
-    } else if (index >= SLIDES.length) {
+    } else if (index >= slides.length) {
       transitionTo({ kind: "review" });
     } else {
       transitionTo({ kind: "slide", index });
@@ -900,14 +908,14 @@ export default function UnpauseIntakeForm() {
 
   const currentOrdinal =
     step.kind === "slide"
-      ? QUESTION_ORDINALS[step.index]
+      ? questionOrdinals[step.index]
       : step.kind === "review" || step.kind === "done"
-        ? TOTAL_QUESTIONS
+        ? totalQuestions
         : 0;
-  const progress = TOTAL_QUESTIONS === 0 ? 0 : Math.round((currentOrdinal / TOTAL_QUESTIONS) * 100);
+  const progress = totalQuestions === 0 ? 0 : Math.round((currentOrdinal / totalQuestions) * 100);
 
   const stepKey = step.kind === "slide" ? `slide-${step.index}` : step.kind;
-  const slide = step.kind === "slide" ? SLIDES[step.index] : null;
+  const slide = step.kind === "slide" ? (slides[step.index] ?? null) : null;
   const canAdvance = isSlideComplete(slide, answers);
   const lastPart = slide?.kind === "question" ? slide.question.parts[slide.question.parts.length - 1] : null;
   const showEnterHint = lastPart?.part.kind === "short-text";
@@ -934,9 +942,9 @@ export default function UnpauseIntakeForm() {
     center: { opacity: 1, y: 0, transition: { duration: 0.45, ease: EASE } },
   };
 
-  const reviewSections = SECTIONS.map((section) => {
+  const reviewSections = activeSections.map((section) => {
     const items = section.questions.flatMap((question) => {
-      const slideIndex = SLIDES.findIndex((s) => s.kind === "question" && s.question.id === question.id);
+      const slideIndex = slides.findIndex((s) => s.kind === "question" && s.question.id === question.id);
       return question.parts
         .map((part) => {
           const key = keyFor(question.id, part.id);
@@ -954,7 +962,7 @@ export default function UnpauseIntakeForm() {
     step.kind === "slide" && slide
       ? slide.kind === "divider"
         ? `Section ${slide.section.number}: ${slide.section.title}`
-        : `Question ${QUESTION_ORDINALS[step.index]} of ${TOTAL_QUESTIONS}: ${slide.question.prompt}`
+        : `Question ${questionOrdinals[step.index]} of ${totalQuestions}: ${slide.question.prompt}`
       : step.kind === "review"
         ? "Review your answers before submitting."
         : step.kind === "done"
@@ -1090,7 +1098,7 @@ export default function UnpauseIntakeForm() {
                                 variants={textItemVariants}
                                 className={EYEBROW_LABEL}
                               >
-                                SECTION <AnimatedOrdinal value={slide.sectionIndex + 1} /> OF {SECTIONS.length}
+                                SECTION <AnimatedOrdinal value={slide.sectionIndex + 1} /> OF {activeSections.length}
                               </motion.p>
                               <motion.h2
                                 variants={textItemVariants}
@@ -1131,7 +1139,7 @@ export default function UnpauseIntakeForm() {
                                     variants={textItemVariants}
                                     className={EYEBROW_LABEL}
                                   >
-                                    SECTION <AnimatedOrdinal value={slide.sectionIndex + 1} /> OF {SECTIONS.length}
+                                    SECTION <AnimatedOrdinal value={slide.sectionIndex + 1} /> OF {activeSections.length}
                                     {" · "}
                                     {remainingInSection === 0 ? (
                                       "last question in this section"
@@ -1350,7 +1358,7 @@ export default function UnpauseIntakeForm() {
             <button
               type="button"
               className="-m-2 p-2 text-sm font-medium text-neutral-500 transition hover:text-neutral-900"
-              onClick={() => (step.kind === "slide" ? goTo(step.index - 1) : goTo(SLIDES.length - 1))}
+              onClick={() => (step.kind === "slide" ? goTo(step.index - 1) : goTo(slides.length - 1))}
             >
               ← Back
             </button>
@@ -1453,7 +1461,7 @@ export default function UnpauseIntakeForm() {
                       : submitting
                         ? "Submitting..."
                         : "Submit The Unbrief"
-                    : step.index === SLIDES.length - 1
+                    : step.index === slides.length - 1
                       ? "Review your answers"
                       : "Continue"}
                 </span>

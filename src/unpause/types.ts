@@ -42,6 +42,8 @@ export interface SectionSpec {
   host: string;
   intro?: string;
   questions: QuestionSpec[];
+  /** Section is included only when this returns true for the answers so far. Omit to always include. */
+  condition?: (answers: Record<string, unknown>) => boolean;
 }
 
 export interface UploadedFileRef {
