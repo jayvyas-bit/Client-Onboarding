@@ -881,7 +881,7 @@ export default function UnpauseIntakeForm() {
                       whileHover={{ y: -2, boxShadow: "0 10px 25px -10px rgba(0,0,0,0.35)" }}
                       whileTap={{ scale: 0.97 }}
                       transition={{ type: "spring", stiffness: 400, damping: 26 }}
-                      className="mt-4 w-fit rounded-full bg-neutral-900 px-8 py-3 text-sm font-medium text-white"
+                      className="mt-4 w-fit rounded-full bg-[#01213B] px-8 py-3 text-sm font-medium text-white"
                       onClick={() => goTo(0)}
                     >
                       Ready? Let's begin
@@ -1085,7 +1085,7 @@ export default function UnpauseIntakeForm() {
                     : { scale: 0.97 }
                 }
                 transition={{ type: "spring", stiffness: 400, damping: 26 }}
-                className="rounded-full bg-neutral-900 px-8 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-full bg-[#01213B] px-8 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
                 onClick={() => (step.kind === "review" ? handleSubmit() : goTo(step.index + 1))}
               >
                 {step.kind === "review"
