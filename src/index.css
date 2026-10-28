@@ -4,32 +4,3 @@ body {
   margin: 0;
   font-family: "Lora", "Georgia", serif;
 }
-
-@keyframes unpause-slide-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.unpause-slide-in {
-  animation: unpause-slide-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes unpause-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.45;
-  }
-}
-
-.unpause-pulse {
-  animation: unpause-pulse 1.1s ease-in-out infinite;
-}
