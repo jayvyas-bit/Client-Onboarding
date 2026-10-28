@@ -1,5 +1,5 @@
 import { SECTIONS } from "./content";
-import type { QuestionPart, QuestionSpec, SectionSpec } from "./types";
+import type { QuestionSpec, SectionSpec } from "./types";
 
 export interface DividerSlide {
   kind: "divider";
@@ -12,27 +12,19 @@ export interface QuestionSlide {
   section: SectionSpec;
   sectionIndex: number;
   question: QuestionSpec;
-  part: QuestionPart;
-  partPosition: number;
-  partCount: number;
 }
 
 export type Slide = DividerSlide | QuestionSlide;
 
 export const SLIDES: Slide[] = SECTIONS.flatMap((section, sectionIndex) => [
   { kind: "divider", section, sectionIndex } satisfies DividerSlide,
-  ...section.questions.flatMap((question) =>
-    question.parts.map(
-      (part, i): QuestionSlide => ({
-        kind: "question",
-        section,
-        sectionIndex,
-        question,
-        part,
-        partPosition: i + 1,
-        partCount: question.parts.length,
-      }),
-    ),
+  ...section.questions.map(
+    (question): QuestionSlide => ({
+      kind: "question",
+      section,
+      sectionIndex,
+      question,
+    }),
   ),
 ]);
 

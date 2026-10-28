@@ -70,11 +70,12 @@ function isFieldValid(field: FieldSpec, raw: string): boolean {
 
 function isSlideComplete(slide: Slide | null, answers: AnswerStore): boolean {
   if (!slide || slide.kind !== "question") return true;
-  const part = slide.part.part;
-  if (part.kind !== "fields") return true;
-  const key = keyFor(slide.question.id, slide.part.id);
-  const value = (answers[key] as Record<string, string>) ?? {};
-  return part.fields.every((field) => isFieldValid(field, value[field.id] ?? ""));
+  return slide.question.parts.every((part) => {
+    if (part.part.kind !== "fields") return true;
+    const key = keyFor(slide.question.id, part.id);
+    const value = (answers[key] as Record<string, string>) ?? {};
+    return part.part.fields.every((field) => isFieldValid(field, value[field.id] ?? ""));
+  });
 }
 
 function useOptionShortcuts(
@@ -791,7 +792,8 @@ export default function UnpauseIntakeForm() {
   const stepKey = step.kind === "slide" ? `slide-${step.index}` : step.kind;
   const slide = step.kind === "slide" ? SLIDES[step.index] : null;
   const canAdvance = isSlideComplete(slide, answers);
-  const showEnterHint = slide?.kind === "question" && slide.part.part.kind === "short-text";
+  const lastPart = slide?.kind === "question" ? slide.question.parts[slide.question.parts.length - 1] : null;
+  const showEnterHint = lastPart?.part.kind === "short-text";
 
   const slideVariants = {
     enter: (dir: number) =>
@@ -914,38 +916,60 @@ export default function UnpauseIntakeForm() {
                           </div>
                         ) : (
                           (() => {
-                            const { question, part, partCount } = slide;
-                            const isMainPart = part.id === "main" || !part.label;
-                            const heading = isMainPart ? question.prompt : part.label!;
-                            const helper = isMainPart ? question.helper : part.helper;
-                            const key = keyFor(question.id, part.id);
-                            const otherKey = `${key}__other`;
-                            const headingId = `heading-${key}`;
+                            const { question } = slide;
+                            const mainHeadingId = `heading-${question.id}`;
                             return (
-                              <div className="flex flex-col gap-6">
+                              <div className="flex flex-col gap-8">
                                 <div>
                                   <p className="text-xs font-medium tracking-[0.2em] text-neutral-400">
                                     QUESTION {ordinal} OF {TOTAL_QUESTIONS}
                                   </p>
-                                  {!isMainPart && partCount > 1 && (
-                                    <p className="mt-2 text-sm italic text-neutral-400">
-                                      Following up: &ldquo;{question.prompt}&rdquo;
-                                    </p>
-                                  )}
-                                  <h2 id={headingId} className="mt-2 text-2xl font-medium text-neutral-900 sm:text-3xl">
-                                    {heading}
+                                  <h2
+                                    id={mainHeadingId}
+                                    className="mt-2 text-2xl font-medium text-neutral-900 sm:text-3xl"
+                                  >
+                                    {question.prompt}
                                   </h2>
-                                  {helper && <p className="mt-2 text-neutral-500 leading-relaxed">{helper}</p>}
+                                  {question.helper && (
+                                    <p className="mt-2 text-neutral-500 leading-relaxed">{question.helper}</p>
+                                  )}
                                 </div>
-                                <PartRenderer
-                                  part={part.part}
-                                  value={answers[key]}
-                                  otherValue={(answers[otherKey] as string) ?? ""}
-                                  onChange={(v) => setAnswer(key, v)}
-                                  onOtherChange={(v) => setAnswer(otherKey, v)}
-                                  onAdvance={() => goTo(step.index + 1)}
-                                  headingId={headingId}
-                                />
+                                {question.parts.map((part, i) => {
+                                  const key = keyFor(question.id, part.id);
+                                  const otherKey = `${key}__other`;
+                                  const isLast = i === question.parts.length - 1;
+                                  const partHeadingId = i === 0 ? mainHeadingId : `heading-${key}`;
+                                  return (
+                                    <div
+                                      key={part.id}
+                                      className={
+                                        i > 0
+                                          ? "flex flex-col gap-4 border-t border-neutral-900/10 pt-6"
+                                          : "flex flex-col gap-4"
+                                      }
+                                    >
+                                      {i > 0 && part.label && (
+                                        <div>
+                                          <h3 id={partHeadingId} className="text-lg font-medium text-neutral-800">
+                                            {part.label}
+                                          </h3>
+                                          {part.helper && (
+                                            <p className="mt-1 text-sm text-neutral-500">{part.helper}</p>
+                                          )}
+                                        </div>
+                                      )}
+                                      <PartRenderer
+                                        part={part.part}
+                                        value={answers[key]}
+                                        otherValue={(answers[otherKey] as string) ?? ""}
+                                        onChange={(v) => setAnswer(key, v)}
+                                        onOtherChange={(v) => setAnswer(otherKey, v)}
+                                        onAdvance={isLast ? () => goTo(step.index + 1) : undefined}
+                                        headingId={partHeadingId}
+                                      />
+                                    </div>
+                                  );
+                                })}
                               </div>
                             );
                           })()
