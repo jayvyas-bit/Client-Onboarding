@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
-import { SECTIONS, INTRO, THANK_YOU } from "./content";
-import type { AnswerPart, FieldSpec, QuestionPart, QuestionSpec, UploadOrTextValue } from "./types";
+import { INTRO, SECTIONS, THANK_YOU } from "./content";
+import { QUESTION_ORDINALS, SLIDES, TOTAL_QUESTIONS } from "./flow";
+import MicButton from "./MicButton";
+import type { AnswerPart, FieldSpec, UploadOrTextValue } from "./types";
 
 type AnswerStore = Record<string, unknown>;
 
-type Step = { kind: "intro" } | { kind: "section"; index: number } | { kind: "review" } | { kind: "done" };
+type Step = { kind: "intro" } | { kind: "slide"; index: number } | { kind: "review" } | { kind: "done" };
 
 function keyFor(questionId: string, partId: string) {
   return `${questionId}.${partId}`;
@@ -42,19 +44,30 @@ function ShortTextInput({
   value,
   onChange,
   placeholder,
+  onAdvance,
 }: {
   value: string;
   onChange: (next: string) => void;
   placeholder?: string;
+  onAdvance?: () => void;
 }) {
   return (
-    <input
-      type="text"
-      className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-neutral-900 outline-none transition focus:border-neutral-900"
-      placeholder={placeholder}
-      value={value ?? ""}
-      onChange={(e) => onChange(e.target.value)}
-    />
+    <div className="flex items-center gap-3">
+      <input
+        type="text"
+        className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-neutral-900 outline-none transition focus:border-neutral-900"
+        placeholder={placeholder}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onAdvance?.();
+          }
+        }}
+      />
+      <MicButton onTranscript={(text) => onChange(value ? `${value} ${text}` : text)} />
+    </div>
   );
 }
 
@@ -68,13 +81,19 @@ function LongTextInput({
   placeholder?: string;
 }) {
   return (
-    <textarea
-      rows={4}
-      className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-neutral-900 outline-none transition focus:border-neutral-900"
-      placeholder={placeholder ?? "Type your answer..."}
-      value={value ?? ""}
-      onChange={(e) => onChange(e.target.value)}
-    />
+    <div className="flex flex-col gap-2">
+      <textarea
+        rows={4}
+        className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2.5 text-neutral-900 outline-none transition focus:border-neutral-900"
+        placeholder={placeholder ?? "Type your answer..."}
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <div className="flex items-center gap-2">
+        <MicButton onTranscript={(text) => onChange(value ? `${value} ${text}` : text)} />
+        <span className="text-xs text-neutral-400">Or tap to speak your answer</span>
+      </div>
+    </div>
   );
 }
 
@@ -85,6 +104,7 @@ function SingleSelectInput({
   otherValue,
   onChange,
   onOtherChange,
+  onAdvance,
 }: {
   options: string[];
   allowOther?: boolean;
@@ -92,8 +112,23 @@ function SingleSelectInput({
   otherValue: string;
   onChange: (next: string) => void;
   onOtherChange: (next: string) => void;
+  onAdvance?: () => void;
 }) {
   const effectiveOptions = allowOther ? [...options, "Something else"] : options;
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+  }, []);
+
+  function handleSelect(option: string) {
+    onChange(option);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (onAdvance && option !== "Something else") {
+      timeoutRef.current = setTimeout(() => onAdvance(), 350);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-2">
       {effectiveOptions.map((option) => (
@@ -107,7 +142,7 @@ function SingleSelectInput({
             type="radio"
             className="h-4 w-4 accent-neutral-900"
             checked={value === option}
-            onChange={() => onChange(option)}
+            onChange={() => handleSelect(option)}
           />
           <span className="text-neutral-800">{option}</span>
         </label>
@@ -119,6 +154,12 @@ function SingleSelectInput({
           placeholder="Tell us more..."
           value={otherValue ?? ""}
           onChange={(e) => onOtherChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              onAdvance?.();
+            }
+          }}
         />
       )}
     </div>
@@ -133,6 +174,7 @@ function MultiSelectInput({
   otherValue,
   onChange,
   onOtherChange,
+  onAdvance,
 }: {
   options: string[];
   allowOther?: boolean;
@@ -141,6 +183,7 @@ function MultiSelectInput({
   otherValue: string;
   onChange: (next: string[]) => void;
   onOtherChange: (next: string) => void;
+  onAdvance?: () => void;
 }) {
   const effectiveOptions = allowOther ? [...options, "Something else"] : options;
   const selected = value ?? [];
@@ -189,6 +232,12 @@ function MultiSelectInput({
           placeholder="Tell us more..."
           value={otherValue ?? ""}
           onChange={(e) => onOtherChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              onAdvance?.();
+            }
+          }}
         />
       )}
     </div>
@@ -274,17 +323,22 @@ function UploadOrTextInput({
         value={current.text}
         onChange={(e) => onChange({ ...current, text: e.target.value })}
       />
-      <label className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-dashed border-neutral-300 px-3.5 py-2.5 text-sm text-neutral-600 transition hover:border-neutral-500">
-        <span>{uploading ? "Uploading..." : "+ Upload image(s)"}</span>
-        <input
-          type="file"
-          accept="image/*,.pdf"
-          multiple
-          disabled={uploading}
-          className="hidden"
-          onChange={(e) => handleFiles(e.target.files)}
+      <div className="flex flex-wrap items-center gap-3">
+        <label className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border border-dashed border-neutral-300 px-3.5 py-2.5 text-sm text-neutral-600 transition hover:border-neutral-500">
+          <span>{uploading ? "Uploading..." : "+ Upload image(s)"}</span>
+          <input
+            type="file"
+            accept="image/*,.pdf"
+            multiple
+            disabled={uploading}
+            className="hidden"
+            onChange={(e) => handleFiles(e.target.files)}
+          />
+        </label>
+        <MicButton
+          onTranscript={(text) => onChange({ ...current, text: current.text ? `${current.text} ${text}` : text })}
         />
-      </label>
+      </div>
       {uploadError && <p className="text-sm text-red-600">{uploadError}</p>}
       {current.files.length > 0 && (
         <ul className="flex flex-col gap-1.5">
@@ -312,12 +366,14 @@ function PartRenderer({
   otherValue,
   onChange,
   onOtherChange,
+  onAdvance,
 }: {
   part: AnswerPart;
   value: unknown;
   otherValue: string;
   onChange: (next: unknown) => void;
   onOtherChange: (next: string) => void;
+  onAdvance?: () => void;
 }) {
   switch (part.kind) {
     case "fields":
@@ -329,7 +385,14 @@ function PartRenderer({
         />
       );
     case "short-text":
-      return <ShortTextInput value={(value as string) ?? ""} onChange={onChange} placeholder={part.placeholder} />;
+      return (
+        <ShortTextInput
+          value={(value as string) ?? ""}
+          onChange={onChange}
+          placeholder={part.placeholder}
+          onAdvance={onAdvance}
+        />
+      );
     case "long-text":
       return <LongTextInput value={(value as string) ?? ""} onChange={onChange} placeholder={part.placeholder} />;
     case "single-select":
@@ -341,6 +404,7 @@ function PartRenderer({
           otherValue={otherValue}
           onChange={onChange}
           onOtherChange={onOtherChange}
+          onAdvance={onAdvance}
         />
       );
     case "multi-select":
@@ -353,6 +417,7 @@ function PartRenderer({
           otherValue={otherValue}
           onChange={onChange}
           onOtherChange={onOtherChange}
+          onAdvance={onAdvance}
         />
       );
     case "scale-pairs":
@@ -374,43 +439,6 @@ function PartRenderer({
   }
 }
 
-function QuestionBlock({
-  question,
-  answers,
-  setAnswer,
-}: {
-  question: QuestionSpec;
-  answers: AnswerStore;
-  setAnswer: (key: string, value: unknown) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-5 border-b border-neutral-200 pb-8 last:border-b-0 last:pb-0">
-      <div>
-        <p className="text-xs font-medium tracking-wide text-neutral-400">Q{question.number}</p>
-        <h3 className="mt-1 text-lg font-medium text-neutral-900">{question.prompt}</h3>
-        {question.helper && <p className="mt-1.5 text-sm leading-relaxed text-neutral-500">{question.helper}</p>}
-      </div>
-      {question.parts.map((qp: QuestionPart) => {
-        const key = keyFor(question.id, qp.id);
-        const otherKey = `${key}__other`;
-        return (
-          <div key={key} className="flex flex-col gap-2">
-            {qp.label && <p className="text-sm font-medium text-neutral-700">{qp.label}</p>}
-            {qp.helper && <p className="-mt-1 text-sm text-neutral-500">{qp.helper}</p>}
-            <PartRenderer
-              part={qp.part}
-              value={answers[key]}
-              otherValue={(answers[otherKey] as string) ?? ""}
-              onChange={(v) => setAnswer(key, v)}
-              onOtherChange={(v) => setAnswer(otherKey, v)}
-            />
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function UnpauseIntakeForm() {
   const [step, setStep] = useState<Step>({ kind: "intro" });
   const [answers, setAnswers] = useState<AnswerStore>({});
@@ -425,13 +453,13 @@ export default function UnpauseIntakeForm() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  function goToSection(index: number) {
+  function goTo(index: number) {
     if (index < 0) {
       setStep({ kind: "intro" });
-    } else if (index >= SECTIONS.length) {
+    } else if (index >= SLIDES.length) {
       setStep({ kind: "review" });
     } else {
-      setStep({ kind: "section", index });
+      setStep({ kind: "slide", index });
     }
     scrollTop();
   }
@@ -458,8 +486,9 @@ export default function UnpauseIntakeForm() {
     }
   }
 
-  const progress =
-    step.kind === "section" ? Math.round(((step.index + 1) / (SECTIONS.length + 1)) * 100) : step.kind === "review" ? 95 : 0;
+  const currentOrdinal =
+    step.kind === "slide" ? QUESTION_ORDINALS[step.index] : step.kind === "review" || step.kind === "done" ? TOTAL_QUESTIONS : 0;
+  const progress = TOTAL_QUESTIONS === 0 ? 0 : Math.round((currentOrdinal / TOTAL_QUESTIONS) * 100);
 
   return (
     <div className="min-h-screen bg-[#faf8f5]">
@@ -495,47 +524,75 @@ export default function UnpauseIntakeForm() {
             <button
               type="button"
               className="mt-4 w-fit rounded-full bg-neutral-900 px-8 py-3 text-sm font-medium text-white transition hover:bg-neutral-700"
-              onClick={() => goToSection(0)}
+              onClick={() => goTo(0)}
             >
               Ready? Let's begin
             </button>
           </div>
         )}
 
-        {step.kind === "section" &&
+        {step.kind === "slide" &&
           (() => {
-            const section = SECTIONS[step.index];
+            const slide = SLIDES[step.index];
+            const ordinal = QUESTION_ORDINALS[step.index];
             return (
-              <div className="flex flex-col gap-10">
-                <div>
-                  <p className="text-xs font-medium tracking-[0.2em] text-neutral-400">
-                    SECTION {section.number} / {String(SECTIONS.length).padStart(2, "0")}
-                  </p>
-                  <h2 className="mt-2 text-2xl font-medium text-neutral-900">{section.title}</h2>
-                  <p className="mt-1 text-sm text-neutral-500">{section.host}</p>
-                  {section.intro && <p className="mt-3 text-neutral-600 leading-relaxed">{section.intro}</p>}
-                </div>
+              <div key={`slide-${step.index}`} className="unpause-slide-in flex flex-col gap-8">
+                {slide.kind === "divider" ? (
+                  <div className="flex flex-col gap-4">
+                    <p className="text-xs font-medium tracking-[0.2em] text-neutral-400">
+                      SECTION {slide.section.number} / {String(SECTIONS.length).padStart(2, "0")}
+                    </p>
+                    <h2 className="text-3xl font-medium text-neutral-900">{slide.section.title}</h2>
+                    <p className="text-sm text-neutral-500">{slide.section.host}</p>
+                    {slide.section.intro && <p className="text-neutral-600 leading-relaxed">{slide.section.intro}</p>}
+                  </div>
+                ) : (
+                  (() => {
+                    const { question, part, partCount } = slide;
+                    const isMainPart = part.id === "main" || !part.label;
+                    const heading = isMainPart ? question.prompt : part.label!;
+                    const helper = isMainPart ? question.helper : part.helper;
+                    const key = keyFor(question.id, part.id);
+                    const otherKey = `${key}__other`;
+                    return (
+                      <div className="flex flex-col gap-6">
+                        <div>
+                          <p className="text-xs font-medium tracking-[0.2em] text-neutral-400">
+                            QUESTION {ordinal} OF {TOTAL_QUESTIONS}
+                          </p>
+                          {!isMainPart && partCount > 1 && (
+                            <p className="mt-2 text-sm italic text-neutral-400">Following up: &ldquo;{question.prompt}&rdquo;</p>
+                          )}
+                          <h2 className="mt-2 text-2xl font-medium text-neutral-900 sm:text-3xl">{heading}</h2>
+                          {helper && <p className="mt-2 text-neutral-500 leading-relaxed">{helper}</p>}
+                        </div>
+                        <PartRenderer
+                          part={part.part}
+                          value={answers[key]}
+                          otherValue={(answers[otherKey] as string) ?? ""}
+                          onChange={(v) => setAnswer(key, v)}
+                          onOtherChange={(v) => setAnswer(otherKey, v)}
+                          onAdvance={() => goTo(step.index + 1)}
+                        />
+                      </div>
+                    );
+                  })()
+                )}
 
-                <div className="flex flex-col gap-8">
-                  {section.questions.map((question) => (
-                    <QuestionBlock key={question.id} question={question} answers={answers} setAnswer={setAnswer} />
-                  ))}
-                </div>
-
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between pt-2">
                   <button
                     type="button"
                     className="text-sm font-medium text-neutral-500 transition hover:text-neutral-900"
-                    onClick={() => goToSection(step.index - 1)}
+                    onClick={() => goTo(step.index - 1)}
                   >
                     ← Back
                   </button>
                   <button
                     type="button"
                     className="rounded-full bg-neutral-900 px-8 py-3 text-sm font-medium text-white transition hover:bg-neutral-700"
-                    onClick={() => goToSection(step.index + 1)}
+                    onClick={() => goTo(step.index + 1)}
                   >
-                    {step.index === SECTIONS.length - 1 ? "Review your answers" : "Continue"}
+                    {step.index === SLIDES.length - 1 ? "Review your answers" : "Continue"}
                   </button>
                 </div>
               </div>
@@ -566,7 +623,7 @@ export default function UnpauseIntakeForm() {
               <button
                 type="button"
                 className="text-sm font-medium text-neutral-500 transition hover:text-neutral-900"
-                onClick={() => goToSection(SECTIONS.length - 1)}
+                onClick={() => goTo(SLIDES.length - 1)}
               >
                 ← Back
               </button>
