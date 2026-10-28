@@ -33,14 +33,14 @@ const SYSTEM_PROMPT = `You are a senior creative strategist at a branding studio
 
 Structure your response in these sections, using plain text with simple headers (no markdown symbols like ** or #):
 
-CLIENT SNAPSHOT
-One or two sentences: who they are, what they make, where they are in their journey.
+FOUNDER PROFILE
+Who this person is as a founder/creative: their role, how they describe themselves and their motivations, their decision-making style, and how they prefer to collaborate. Synthesize this from their answers, don't just restate their name and title.
+
+COMPANY PROFILE
+What the brand makes or sells, where it is in its journey, who it serves and why people choose it, and how it positions itself against alternatives. This is the business snapshot the team needs before the call.
 
 WHY NOW
 What's driving this project right now, and what success looks like to them in their own words.
-
-AUDIENCE & POSITIONING
-Who they're trying to reach and why people choose them, synthesized, not just restated.
 
 AESTHETIC DIRECTION
 What visual direction the answers point to (tone, references, likes/dislikes), flagged as a hypothesis for the designers to confirm, not a final decision.
@@ -51,7 +51,7 @@ Timeline, budget signals, decision-making structure, and anything that could aff
 OPEN QUESTIONS FOR THE KICKOFF CALL
 2-4 specific, sharp questions the team should ask to fill gaps or resolve ambiguity in their answers.
 
-Keep the whole thing under 350 words. Be concrete and specific to THIS client's actual answers, never generic boilerplate. If a section has nothing meaningful to say because the client left it blank or it doesn't apply, say so briefly rather than inventing content.`;
+Keep the whole thing under 420 words. Be concrete and specific to THIS client's actual answers, never generic boilerplate. If a section has nothing meaningful to say because the client left it blank or it doesn't apply, say so briefly rather than inventing content.`;
 
 export async function generateSmartAnalysis(answers: Record<string, unknown>): Promise<string | null> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -69,7 +69,7 @@ export async function generateSmartAnalysis(answers: Record<string, unknown>): P
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
           contents: [{ role: "user", parts: [{ text: transcript }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 1024 },
+          generationConfig: { temperature: 0.4, maxOutputTokens: 1536 },
         }),
       },
     );

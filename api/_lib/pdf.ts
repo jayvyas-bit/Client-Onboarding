@@ -9,6 +9,11 @@ interface SubmissionForPdf {
   analysis?: string | null;
 }
 
+function field(obj: Record<string, unknown> | undefined, key: string): string {
+  const value = obj?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : "—";
+}
+
 export function buildSubmissionPdf(submission: SubmissionForPdf): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 56 });
@@ -26,6 +31,31 @@ export function buildSubmissionPdf(submission: SubmissionForPdf): Promise<Buffer
       .text(submission.id)
       .fillColor("#000000");
     doc.moveDown(1.5);
+
+    const who = submission.answers["q1.main"] as Record<string, unknown> | undefined;
+    const brandNameFields = submission.answers["q15.main"] as Record<string, unknown> | undefined;
+
+    doc.font("Helvetica-Bold").fontSize(13).fillColor("#000000").text("CLIENT");
+    doc.moveDown(0.3);
+    doc
+      .font("Helvetica")
+      .fontSize(10)
+      .fillColor("#333333")
+      .text(`Name: ${field(who, "name")}`)
+      .text(`Email: ${field(who, "email")}`)
+      .text(`Role: ${field(who, "role")}`)
+      .text(`Location: ${field(who, "location")}`);
+    doc.fillColor("#000000").moveDown(1);
+
+    doc.font("Helvetica-Bold").fontSize(13).fillColor("#000000").text("COMPANY");
+    doc.moveDown(0.3);
+    doc
+      .font("Helvetica")
+      .fontSize(10)
+      .fillColor("#333333")
+      .text(`Brand / business name: ${field(who, "brand") !== "—" ? field(who, "brand") : field(brandNameFields, "brandName")}`)
+      .text(`Website: ${field(who, "website")}`);
+    doc.fillColor("#000000").moveDown(1.5);
 
     if (submission.analysis) {
       doc.font("Helvetica-Bold").fontSize(13).fillColor("#000000").text("AI SNAPSHOT — FOR THE TEAM");
