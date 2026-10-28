@@ -868,7 +868,7 @@ export default function UnpauseIntakeForm() {
           <span className="text-sm font-semibold tracking-[0.3em] text-neutral-900">UNPAUSE</span>
         </div>
         <div className="flex flex-1 items-center justify-center px-6 py-10 sm:px-10 sm:py-14">
-          <div className="w-full max-w-4xl rounded-3xl border border-neutral-900/5 bg-[#fffefb] p-8 shadow-[0_20px_60px_-25px_rgba(0,0,0,0.15)] sm:p-12">
+          <div className="w-full max-w-4xl rounded-3xl border border-neutral-900/5 bg-[#fffefb] p-8 shadow-[0_8px_40px_rgba(0,0,0,0.06)] sm:p-12">
             <AnimatePresence mode="wait" custom={direction} initial={false}>
               <motion.div
                 key={stepKey}
@@ -919,7 +919,7 @@ export default function UnpauseIntakeForm() {
 
                     <motion.button
                       type="button"
-                      whileHover={{ y: -2, boxShadow: "0 10px 25px -10px rgba(0,0,0,0.35)" }}
+                      whileHover={{ y: -2, boxShadow: "0 12px 30px rgba(0,0,0,0.14)" }}
                       whileTap={{ scale: 0.97 }}
                       transition={{ type: "spring", stiffness: 400, damping: 26 }}
                       className="mt-4 w-fit rounded-full bg-[#01213B] px-8 py-3 text-sm font-medium text-white"
@@ -1120,7 +1120,7 @@ export default function UnpauseIntakeForm() {
                   (step.kind === "review" && (submitting || submitSucceeded)) ||
                   (step.kind === "slide" && !canAdvance)
                     ? undefined
-                    : { y: -2, boxShadow: "0 10px 25px -10px rgba(0,0,0,0.35)" }
+                    : { y: -2, boxShadow: "0 12px 30px rgba(0,0,0,0.14)" }
                 }
                 whileTap={step.kind === "review" && (submitting || submitSucceeded) ? undefined : { scale: 0.97 }}
                 transition={{ type: "spring", stiffness: 400, damping: 26 }}
