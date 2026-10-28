@@ -928,7 +928,6 @@ export default function UnpauseIntakeForm() {
                         <motion.div
                           key={member.name}
                           variants={teamItemVariants}
-                          whileHover={{ y: -3 }}
                           transition={{ type: "spring", stiffness: 300, damping: 24 }}
                           className="rounded-xl border border-neutral-200 bg-white/70 p-4 shadow-sm"
                         >
