@@ -5,6 +5,7 @@ import { INTRO, THANK_YOU } from "./content";
 import { buildSlides, getActiveSections, getQuestionOrdinals, getTotalQuestions } from "./flow";
 import type { Slide } from "./flow";
 import MicButton from "./MicButton";
+import { SectionIcon, UnpauseMark } from "./icons";
 import type { AnswerPart, FieldSpec, UploadOrTextValue } from "./types";
 
 type AnswerStore = Record<string, unknown>;
@@ -1018,9 +1019,15 @@ export default function UnpauseIntakeForm() {
                 {step.kind === "intro" && (
                   <div className="flex flex-col gap-6">
                     <div className="max-w-prose">
+                      <motion.div
+                        variants={textItemVariants}
+                        className="text-[#004ac7]"
+                      >
+                        <UnpauseMark />
+                      </motion.div>
                       <motion.p
                         variants={textItemVariants}
-                        className={EYEBROW_LABEL}
+                        className={EYEBROW_LABEL + " mt-4"}
                       >
                         {INTRO.eyebrow}
                       </motion.p>
@@ -1089,11 +1096,13 @@ export default function UnpauseIntakeForm() {
                           <div className="flex items-start justify-between gap-6">
                             <div className="flex max-w-prose flex-col gap-4">
                               <motion.div
-                                initial={{ height: 0 }}
-                                animate={{ height: 28 }}
-                                transition={{ duration: 0.55, ease: EASE }}
-                                className="w-0.5 rounded-full bg-neutral-900/30"
-                              />
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.5, ease: EASE }}
+                                style={{ color: accent }}
+                              >
+                                <SectionIcon id={slide.section.id} />
+                              </motion.div>
                               <motion.p
                                 variants={textItemVariants}
                                 className={EYEBROW_LABEL}
@@ -1236,7 +1245,8 @@ export default function UnpauseIntakeForm() {
                         const accent = SECTION_ACCENTS[trueIndex % SECTION_ACCENTS.length];
                         return (
                           <div key={section.id} className="flex flex-col gap-3">
-                            <div className="flex items-baseline gap-2.5">
+                            <div className="flex items-center gap-2.5">
+                              <SectionIcon id={section.id} size={16} className="shrink-0" style={{ color: accent }} />
                               <span className="text-xs font-semibold tabular-nums" style={{ color: accent }}>
                                 {String(trueIndex + 1).padStart(2, "0")}
                               </span>
