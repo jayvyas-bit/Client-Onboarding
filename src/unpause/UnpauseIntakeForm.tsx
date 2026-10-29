@@ -347,7 +347,7 @@ function OptionRow({
       whileHover={disabled ? undefined : { x: 4 }}
       whileTap={disabled ? undefined : { scale: 0.985 }}
       transition={{ type: "spring", stiffness: 500, damping: 32 }}
-      className={`group flex w-full items-center gap-3.5 rounded-xl border px-4 py-3.5 text-left transition-colors ${
+      className={`group flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
         selected
           ? "border-neutral-900 bg-neutral-900/[0.04]"
           : "border-neutral-200 bg-white/70 hover:border-neutral-400"
@@ -356,7 +356,7 @@ function OptionRow({
       <motion.span
         animate={{ scale: selected ? [1, 1.18, 1] : 1 }}
         transition={{ duration: 0.34, ease: EASE }}
-        className={`flex h-7 w-7 shrink-0 items-center justify-center text-xs font-medium transition-colors ${
+        className={`flex h-6 w-6 shrink-0 items-center justify-center text-xs font-medium transition-colors ${
           shape === "circle" ? "rounded-full" : "rounded-md"
         } ${
           selected
@@ -401,7 +401,7 @@ function OptionRow({
           )}
         </AnimatePresence>
       </motion.span>
-      <span className="text-[15px] text-neutral-800">{label}</span>
+      <span className="text-sm text-neutral-800">{label}</span>
     </motion.button>
   );
 }
@@ -410,10 +410,12 @@ function OtherTextField({
   value,
   onChange,
   onAdvance,
+  fullWidth,
 }: {
   value: string;
   onChange: (next: string) => void;
   onAdvance?: () => void;
+  fullWidth?: boolean;
 }) {
   return (
     <motion.div
@@ -421,7 +423,7 @@ function OtherTextField({
       animate={{ height: "auto", opacity: 1 }}
       exit={{ height: 0, opacity: 0 }}
       transition={{ duration: 0.2, ease: EASE }}
-      className="overflow-hidden"
+      className={`overflow-hidden ${fullWidth ? "sm:col-span-2" : ""}`}
     >
       <input
         type="text"
@@ -477,9 +479,15 @@ function SingleSelectInput({
   }
 
   useOptionShortcuts(effectiveOptions, handleSelect, containerRef);
+  const isDense = effectiveOptions.length > 4;
 
   return (
-    <div ref={containerRef} role="radiogroup" aria-labelledby={labelledBy} className="flex flex-col gap-2.5">
+    <div
+      ref={containerRef}
+      role="radiogroup"
+      aria-labelledby={labelledBy}
+      className={`grid gap-2 ${isDense ? "grid-cols-1 sm:grid-cols-2 sm:gap-x-4" : "grid-cols-1"}`}
+    >
       {effectiveOptions.map((option, index) => (
         <OptionRow
           key={option}
@@ -493,7 +501,7 @@ function SingleSelectInput({
       ))}
       <AnimatePresence initial={false}>
         {allowOther && value === "Something else" && (
-          <OtherTextField value={otherValue} onChange={onOtherChange} onAdvance={onAdvance} />
+          <OtherTextField value={otherValue} onChange={onOtherChange} onAdvance={onAdvance} fullWidth={isDense} />
         )}
       </AnimatePresence>
     </div>
@@ -535,11 +543,17 @@ function MultiSelectInput({
   }
 
   useOptionShortcuts(effectiveOptions, toggle, containerRef);
+  const isDense = effectiveOptions.length > 4;
 
   return (
-    <div ref={containerRef} role="group" aria-labelledby={labelledBy} className="flex flex-col gap-2.5">
+    <div
+      ref={containerRef}
+      role="group"
+      aria-labelledby={labelledBy}
+      className={`grid gap-2 ${isDense ? "grid-cols-1 sm:grid-cols-2 sm:gap-x-4" : "grid-cols-1"}`}
+    >
       {maxSelect && (
-        <p className="text-xs text-neutral-500" aria-live="polite">
+        <p className={`text-xs text-neutral-500 ${isDense ? "sm:col-span-2" : ""}`} aria-live="polite">
           {selected.length}/{maxSelect} selected
         </p>
       )}
@@ -560,7 +574,7 @@ function MultiSelectInput({
       })}
       <AnimatePresence initial={false}>
         {allowOther && selected.includes("Something else") && (
-          <OtherTextField value={otherValue} onChange={onOtherChange} onAdvance={onAdvance} />
+          <OtherTextField value={otherValue} onChange={onOtherChange} onAdvance={onAdvance} fullWidth={isDense} />
         )}
       </AnimatePresence>
     </div>
@@ -834,8 +848,20 @@ export default function UnpauseIntakeForm() {
   const [submitSucceeded, setSubmitSucceeded] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const slideRef = useRef<HTMLDivElement>(null);
+  const cardContentRef = useRef<HTMLDivElement>(null);
+  const [cardHeight, setCardHeight] = useState<number | null>(null);
   const shouldReduceMotion = useReducedMotion();
   const continueControls = useAnimationControls();
+
+  useEffect(() => {
+    const el = cardContentRef.current;
+    if (!el) return;
+    const updateHeight = () => setCardHeight(el.offsetHeight);
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (step.kind === "resume") return;
@@ -1011,7 +1037,7 @@ export default function UnpauseIntakeForm() {
             : "";
 
   return (
-    <div className="relative min-h-dvh bg-[#faf8f5]">
+    <div className="relative h-dvh overflow-hidden bg-[#faf8f5]">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <motion.div
           className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-neutral-900/[0.04] blur-3xl"
@@ -1036,11 +1062,11 @@ export default function UnpauseIntakeForm() {
         </div>
       )}
 
-      <div className="relative z-10 flex min-h-dvh flex-col">
+      <div className="relative z-10 flex h-dvh flex-col overflow-hidden">
         <div aria-live="polite" className="sr-only">
           {liveAnnouncement}
         </div>
-        <div className="relative pt-6 text-center sm:pt-8">
+        <div className="relative shrink-0 pt-6 text-center sm:pt-8">
           <span className="text-sm font-semibold tracking-[0.3em] text-neutral-900">UNPAUSE</span>
           {step.kind !== "intro" && step.kind !== "resume" && (
             <div className="absolute right-6 top-5 sm:right-10 sm:top-7">
@@ -1090,8 +1116,14 @@ export default function UnpauseIntakeForm() {
             </div>
           )}
         </div>
-        <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 py-10 sm:px-10 sm:py-14">
-          <div className="w-full max-w-4xl rounded-3xl border border-neutral-900/5 bg-[#fffefb] p-8 shadow-[0_8px_40px_rgba(0,0,0,0.06)] sm:p-12">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 overflow-y-auto px-6 py-10 sm:px-10 sm:py-14">
+          <motion.div
+            animate={cardHeight !== null ? { height: cardHeight } : undefined}
+            transition={{ duration: shouldReduceMotion ? 0 : 0.35, ease: EASE }}
+            style={{ overflow: "hidden" }}
+            className="w-full max-w-4xl shrink-0 rounded-3xl border border-neutral-900/5 bg-[#fffefb] shadow-[0_8px_40px_rgba(0,0,0,0.06)]"
+          >
+            <div ref={cardContentRef} className="p-8 sm:p-12">
             <AnimatePresence mode="wait" custom={direction} initial={false}>
               <motion.div
                 key={stepKey}
@@ -1477,10 +1509,11 @@ export default function UnpauseIntakeForm() {
                 )}
               </motion.div>
             </AnimatePresence>
-          </div>
+            </div>
+          </motion.div>
 
           {(step.kind === "slide" || step.kind === "review") && (
-            <div className="w-full max-w-4xl border-t border-neutral-900/10 pt-6">
+            <div className="w-full max-w-4xl shrink-0 border-t border-neutral-900/10 pt-6">
               <div className="flex items-center justify-between">
               <button
                 type="button"
