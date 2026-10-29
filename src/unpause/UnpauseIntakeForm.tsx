@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { AnimatePresence, motion, useAnimationControls, useReducedMotion } from "motion/react";
 import { upload } from "@vercel/blob/client";
+import unpauseLogo from "./assets/unpause-logo.png";
 import { INTRO, THANK_YOU } from "./content";
 import { buildSlides, getActiveSections, getQuestionOrdinals, getTotalQuestions } from "./flow";
 import type { Slide } from "./flow";
@@ -99,14 +100,32 @@ function isFieldValid(field: FieldSpec, raw: string): boolean {
   return true;
 }
 
-function isSlideComplete(slide: Slide | null, answers: AnswerStore): boolean {
-  if (!slide || slide.kind !== "question") return true;
-  return slide.question.parts.every((part) => {
-    if (part.part.kind !== "fields") return true;
+function slideIncompleteReason(slide: Slide | null, answers: AnswerStore): string | null {
+  if (!slide || slide.kind !== "question") return null;
+  for (const part of slide.question.parts) {
     const key = keyFor(slide.question.id, part.id);
-    const value = (answers[key] as Record<string, string>) ?? {};
-    return part.part.fields.every((field) => isFieldValid(field, value[field.id] ?? ""));
-  });
+    if (part.part.kind === "fields") {
+      const value = (answers[key] as Record<string, string>) ?? {};
+      const allValid = part.part.fields.every((field) => isFieldValid(field, value[field.id] ?? ""));
+      if (!allValid) return "Name and email are required";
+      continue;
+    }
+    if (part.part.kind === "scale-pairs") {
+      const value = (answers[key] as Record<number, number>) ?? {};
+      const allTouched = part.part.pairs.every((_, i) => value[i] !== undefined);
+      if (!allTouched) return "Move every slider to continue";
+      continue;
+    }
+    const otherValue = (answers[`${key}__other`] as string) ?? "";
+    if (formatAnswerValue(part.part, answers[key], otherValue) === null) {
+      return "An answer is needed to continue";
+    }
+  }
+  return null;
+}
+
+function isSlideComplete(slide: Slide | null, answers: AnswerStore): boolean {
+  return slideIncompleteReason(slide, answers) === null;
 }
 
 function formatAnswerValue(part: AnswerPart, value: unknown, otherValue: string): string | null {
@@ -581,6 +600,11 @@ function MultiSelectInput({
   );
 }
 
+const SCALE_STEPS = 5;
+const SCALE_MIN = 1;
+const SCALE_MAX = SCALE_STEPS;
+const SCALE_DEFAULT = 3;
+
 function ScalePairsInput({
   pairs,
   value,
@@ -593,32 +617,33 @@ function ScalePairsInput({
   return (
     <div className="flex flex-col gap-8">
       {pairs.map((pair, index) => {
-        const v = value?.[index] ?? 50;
+        const v = value?.[index] ?? SCALE_DEFAULT;
         return (
           <div key={pair.join("-")} className="flex flex-col gap-3">
             <div className="flex justify-between text-sm text-neutral-600">
               <span>{pair[0]}</span>
               <span>{pair[1]}</span>
             </div>
-            <div className="relative pt-6">
-              <motion.div
-                initial={false}
-                animate={{ left: `${v}%` }}
-                transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                className="pointer-events-none absolute top-0 -translate-x-1/2 rounded-full bg-neutral-900 px-2 py-0.5 text-xs font-medium text-white"
-              >
-                {v}
-              </motion.div>
+            <div className="relative">
               <input
                 type="range"
-                min={0}
-                max={100}
+                min={SCALE_MIN}
+                max={SCALE_MAX}
+                step={1}
                 value={v}
                 aria-label={`${pair[0]} to ${pair[1]}`}
-                aria-valuetext={`${v} out of 100, closer to ${v >= 50 ? pair[1] : pair[0]}`}
+                aria-valuetext={`${v} of ${SCALE_STEPS}, closer to ${v >= SCALE_DEFAULT ? pair[1] : pair[0]}`}
                 onChange={(e) => onChange({ ...value, [index]: Number(e.target.value) })}
-                className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-neutral-200 accent-neutral-900"
+                className="relative h-1.5 w-full cursor-pointer appearance-none rounded-full bg-neutral-200 accent-neutral-900"
               />
+              <div className="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-between">
+                {Array.from({ length: SCALE_STEPS }, (_, i) => (
+                  <span
+                    key={i}
+                    className={`h-1.5 w-1.5 rounded-full ${i <= v - SCALE_MIN ? "bg-neutral-900" : "bg-neutral-300"}`}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         );
@@ -981,7 +1006,8 @@ export default function UnpauseIntakeForm() {
 
   const stepKey = step.kind === "slide" ? `slide-${step.index}` : step.kind;
   const slide = step.kind === "slide" ? (slides[step.index] ?? null) : null;
-  const canAdvance = isSlideComplete(slide, answers);
+  const incompleteReason = slideIncompleteReason(slide, answers);
+  const canAdvance = incompleteReason === null;
   const lastPart = slide?.kind === "question" ? slide.question.parts[slide.question.parts.length - 1] : null;
   const showEnterHint = lastPart?.part.kind === "short-text";
 
@@ -1025,9 +1051,7 @@ export default function UnpauseIntakeForm() {
 
   const liveAnnouncement =
     step.kind === "slide" && slide
-      ? slide.kind === "divider"
-        ? `Section ${slide.section.number}: ${slide.section.title}`
-        : `Question ${questionOrdinals[step.index]} of ${totalQuestions}: ${slide.question.prompt}`
+      ? `Question ${questionOrdinals[step.index]} of ${totalQuestions}: ${slide.question.prompt}`
       : step.kind === "review"
         ? "Review your answers before submitting."
         : step.kind === "done"
@@ -1067,7 +1091,7 @@ export default function UnpauseIntakeForm() {
           {liveAnnouncement}
         </div>
         <div className="relative shrink-0 pt-6 text-center sm:pt-8">
-          <span className="text-sm font-semibold tracking-[0.3em] text-neutral-900">UNPAUSE</span>
+          <img src={unpauseLogo} alt="Unpause" className="mx-auto h-5 w-auto" />
           {step.kind !== "intro" && step.kind !== "resume" && (
             <div className="absolute right-6 top-5 sm:right-10 sm:top-7">
               {confirmingReset && (
@@ -1116,7 +1140,8 @@ export default function UnpauseIntakeForm() {
             </div>
           )}
         </div>
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-6 overflow-y-auto px-6 py-10 sm:px-10 sm:py-14">
+        <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-10 sm:px-10 sm:py-14">
+          <div className="my-auto flex w-full flex-col items-center gap-6">
           <motion.div
             animate={cardHeight !== null ? { height: cardHeight } : undefined}
             transition={{ duration: shouldReduceMotion ? 0 : 0.35, ease: EASE }}
@@ -1137,7 +1162,7 @@ export default function UnpauseIntakeForm() {
               >
                 {step.kind === "intro" && (
                   <div className="flex flex-col gap-6">
-                    <div className="max-w-prose">
+                    <div>
                       <motion.div
                         variants={textItemVariants}
                         className="text-[#004ac7]"
@@ -1180,7 +1205,7 @@ export default function UnpauseIntakeForm() {
 
                 {step.kind === "resume" && (
                   <div className="flex flex-col gap-6">
-                    <div className="max-w-prose">
+                    <div>
                       <motion.div variants={textItemVariants} className="text-[#004ac7]">
                         <UnpauseMark />
                       </motion.div>
@@ -1225,135 +1250,114 @@ export default function UnpauseIntakeForm() {
                   slide &&
                   (() => {
                     const accent = SECTION_ACCENTS[slide.sectionIndex % SECTION_ACCENTS.length];
+                    const { question } = slide;
+                    const mainHeadingId = `heading-${question.id}`;
+                    const posInSection = slide.section.questions.findIndex((q) => q.id === question.id);
+                    const remainingInSection = slide.section.questions.length - posInSection - 1;
                     return (
                       <div className="flex flex-col gap-8">
-                        {slide.kind === "divider" ? (
-                          <div className="flex items-start justify-between gap-6">
-                            <div className="flex max-w-prose flex-col gap-4">
-                              <motion.p
-                                variants={textItemVariants}
-                                className={EYEBROW_LABEL}
-                                style={{ color: accent }}
-                              >
-                                SECTION <AnimatedOrdinal value={slide.sectionIndex + 1} /> OF {activeSections.length}
-                              </motion.p>
-                              <motion.h2
-                                variants={textItemVariants}
-                                className="text-3xl font-medium text-neutral-900 sm:text-4xl"
-                              >
-                                {slide.section.title}
-                              </motion.h2>
-                              <motion.p variants={textItemVariants} className="text-sm text-neutral-500">
-                                {slide.section.host}
-                              </motion.p>
-                              {slide.section.intro && (
-                                <motion.p variants={textItemVariants} className="text-neutral-600 leading-relaxed">
-                                  {slide.section.intro}
-                                </motion.p>
-                              )}
-                            </div>
-                            <motion.div
-                              aria-hidden="true"
-                              initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.9, x: 16 }}
-                              animate={{ opacity: 0.1, scale: 1, x: 0 }}
-                              transition={{ duration: 0.7, ease: EASE, delay: 0.1 }}
-                              className="hidden shrink-0 select-none text-[7rem] font-semibold leading-none sm:block sm:text-[9rem]"
+                        {slide.isFirstInSection && (
+                          <div className="flex flex-col gap-1 border-b border-neutral-900/10 pb-6">
+                            <motion.p
+                              variants={textItemVariants}
+                              className={EYEBROW_LABEL}
                               style={{ color: accent }}
                             >
-                              {String(slide.sectionIndex + 1).padStart(2, "0")}
-                            </motion.div>
+                              SECTION <AnimatedOrdinal value={slide.sectionIndex + 1} /> OF {activeSections.length}
+                            </motion.p>
+                            <motion.h3
+                              variants={textItemVariants}
+                              className="text-xl font-medium text-neutral-900"
+                            >
+                              {slide.section.title}
+                            </motion.h3>
+                            <motion.p variants={textItemVariants} className="text-sm text-neutral-500">
+                              {slide.section.host}
+                              {slide.section.intro ? ` — ${slide.section.intro}` : ""}
+                            </motion.p>
                           </div>
-                        ) : (
-                          (() => {
-                            const { question } = slide;
-                            const mainHeadingId = `heading-${question.id}`;
-                            const posInSection = slide.section.questions.findIndex((q) => q.id === question.id);
-                            const remainingInSection = slide.section.questions.length - posInSection - 1;
-                            return (
-                              <div className="flex flex-col gap-8">
-                                <div className="max-w-prose">
-                                  <motion.p
-                                    variants={textItemVariants}
-                                    className="inline-block rounded-full border px-3 py-1 text-xs font-medium tracking-wide"
-                                    style={{
-                                      color: accent,
-                                      borderColor: `${accent}33`,
-                                      backgroundColor: `${accent}14`,
-                                    }}
-                                  >
-                                    {remainingInSection === 0 ? (
-                                      "Last question in this section"
-                                    ) : (
-                                      <>
-                                        <AnimatedOrdinal value={remainingInSection} />
-                                        {` ${remainingInSection === 1 ? "question" : "questions"} left in this section`}
-                                      </>
-                                    )}
-                                  </motion.p>
-                                  <motion.h2
-                                    variants={textItemVariants}
-                                    id={mainHeadingId}
-                                    className="mt-2 text-2xl font-medium text-neutral-900 sm:text-3xl"
-                                  >
-                                    {question.prompt}
-                                  </motion.h2>
-                                  {question.helper && (
-                                    <motion.p
-                                      variants={textItemVariants}
-                                      className="mt-2 text-neutral-500 leading-relaxed"
-                                    >
-                                      {question.helper}
-                                    </motion.p>
-                                  )}
-                                </div>
-                                {question.parts.map((part, i) => {
-                                  const key = keyFor(question.id, part.id);
-                                  const otherKey = `${key}__other`;
-                                  const isLast = i === question.parts.length - 1;
-                                  const partHeadingId = i === 0 ? mainHeadingId : `heading-${key}`;
-                                  return (
-                                    <motion.div
-                                      key={part.id}
-                                      variants={textItemVariants}
-                                      className={
-                                        i > 0
-                                          ? "flex flex-col gap-4 border-t border-neutral-900/10 pt-6"
-                                          : "flex flex-col gap-4"
-                                      }
-                                    >
-                                      {i > 0 && part.label && (
-                                        <div>
-                                          <h3 id={partHeadingId} className="text-lg font-medium text-neutral-800">
-                                            {part.label}
-                                          </h3>
-                                          {part.helper && (
-                                            <p className="mt-1 text-sm text-neutral-500">{part.helper}</p>
-                                          )}
-                                        </div>
-                                      )}
-                                      <PartRenderer
-                                        part={part.part}
-                                        value={answers[key]}
-                                        otherValue={(answers[otherKey] as string) ?? ""}
-                                        onChange={(v) => setAnswer(key, v)}
-                                        onOtherChange={(v) => setAnswer(otherKey, v)}
-                                        onAdvance={isLast ? () => goTo(step.index + 1) : undefined}
-                                        headingId={partHeadingId}
-                                      />
-                                    </motion.div>
-                                  );
-                                })}
-                              </div>
-                            );
-                          })()
                         )}
+                        <div className="flex flex-col gap-8">
+                          <div>
+                            <motion.p
+                              variants={textItemVariants}
+                              className="inline-block rounded-full border px-3 py-1 text-xs font-medium tracking-wide"
+                              style={{
+                                color: accent,
+                                borderColor: `${accent}33`,
+                                backgroundColor: `${accent}14`,
+                              }}
+                            >
+                              {remainingInSection === 0 ? (
+                                "Last question in this section"
+                              ) : (
+                                <>
+                                  <AnimatedOrdinal value={remainingInSection} />
+                                  {` ${remainingInSection === 1 ? "question" : "questions"} left in this section`}
+                                </>
+                              )}
+                            </motion.p>
+                            <motion.h2
+                              variants={textItemVariants}
+                              id={mainHeadingId}
+                              className="mt-2 text-2xl font-medium text-neutral-900 sm:text-3xl"
+                            >
+                              {question.prompt}
+                            </motion.h2>
+                            {question.helper && (
+                              <motion.p
+                                variants={textItemVariants}
+                                className="mt-2 text-neutral-500 leading-relaxed"
+                              >
+                                {question.helper}
+                              </motion.p>
+                            )}
+                          </div>
+                          {question.parts.map((part, i) => {
+                            const key = keyFor(question.id, part.id);
+                            const otherKey = `${key}__other`;
+                            const isLast = i === question.parts.length - 1;
+                            const partHeadingId = i === 0 ? mainHeadingId : `heading-${key}`;
+                            return (
+                              <motion.div
+                                key={part.id}
+                                variants={textItemVariants}
+                                className={
+                                  i > 0
+                                    ? "flex flex-col gap-4 border-t border-neutral-900/10 pt-6"
+                                    : "flex flex-col gap-4"
+                                }
+                              >
+                                {i > 0 && part.label && (
+                                  <div>
+                                    <h3 id={partHeadingId} className="text-lg font-medium text-neutral-800">
+                                      {part.label}
+                                    </h3>
+                                    {part.helper && (
+                                      <p className="mt-1 text-sm text-neutral-500">{part.helper}</p>
+                                    )}
+                                  </div>
+                                )}
+                                <PartRenderer
+                                  part={part.part}
+                                  value={answers[key]}
+                                  otherValue={(answers[otherKey] as string) ?? ""}
+                                  onChange={(v) => setAnswer(key, v)}
+                                  onOtherChange={(v) => setAnswer(otherKey, v)}
+                                  onAdvance={isLast ? () => canAdvance && goTo(step.index + 1) : undefined}
+                                  headingId={partHeadingId}
+                                />
+                              </motion.div>
+                            );
+                          })}
+                        </div>
                       </div>
                     );
                   })()}
 
                 {step.kind === "review" && (
                   <div className="flex flex-col gap-10">
-                    <div className="max-w-prose">
+                    <div>
                       <motion.p variants={textItemVariants} className={EYEBROW_LABEL}>
                         BEFORE YOU GO.
                       </motion.p>
@@ -1523,8 +1527,8 @@ export default function UnpauseIntakeForm() {
                 ← Back
               </button>
               <div className="flex items-center gap-3">
-                {step.kind === "slide" && !canAdvance && (
-                  <span className="hidden text-xs text-neutral-400 sm:inline">Name and email are required</span>
+                {step.kind === "slide" && incompleteReason && (
+                  <span className="hidden text-xs text-neutral-400 sm:inline">{incompleteReason}</span>
                 )}
                 {step.kind === "slide" && canAdvance && showEnterHint && (
                   <span className="hidden text-xs text-neutral-400 sm:inline">press Enter ↵</span>
@@ -1630,6 +1634,7 @@ export default function UnpauseIntakeForm() {
             </div>
           </div>
           )}
+          </div>
         </div>
       </div>
     </div>

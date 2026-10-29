@@ -1,7 +1,7 @@
 import PDFDocument from "pdfkit";
 import { SECTIONS } from "../../src/unpause/content.js";
 import { getActiveSections } from "../../src/unpause/flow.js";
-import { formatValue } from "../../src/unpause/formatAnswer.js";
+import { formatValue, formatValueSegments } from "../../src/unpause/formatAnswer.js";
 
 interface SubmissionForPdf {
   id: string;
@@ -169,7 +169,7 @@ export function buildSubmissionPdf(submission: SubmissionForPdf): Promise<Buffer
           .fontSize(9)
           .fillColor(MUTED)
           .text(`${pair[0]} <-> ${pair[1]}:  `, PAGE_MARGIN, doc.y, { continued: true, width: contentWidth });
-        doc.font("Helvetica-Bold").fontSize(10).fillColor(INK).text(String(value[i]));
+        doc.font("Helvetica-Bold").fontSize(10).fillColor(INK).text(`${value[i]}/5`);
       });
     }
 
@@ -349,9 +349,22 @@ export function buildSubmissionPdf(submission: SubmissionForPdf): Promise<Buffer
           } else if (value && typeof value === "object" && !Array.isArray(value) && !isUploadOrText(value as Record<string, unknown>)) {
             renderFieldsObject(value as Record<string, unknown>);
           } else {
-            let text = formatValue(value);
-            if (typeof otherValue === "string" && otherValue.trim()) text += ` (${otherValue.trim()})`;
-            doc.font("Helvetica").fontSize(10).fillColor(BODY).text(text, { lineGap: 2 });
+            const segments = formatValueSegments(value);
+            const hasOther = typeof otherValue === "string" && otherValue.trim().length > 0;
+            doc.font("Helvetica").fontSize(10);
+            segments.forEach((seg, i) => {
+              const isVeryLast = !hasOther && i === segments.length - 1;
+              if (seg.href) {
+                doc
+                  .fillColor(BRAND)
+                  .text(seg.text, { continued: !isVeryLast, underline: true, link: seg.href, lineGap: 2 });
+              } else {
+                doc.fillColor(BODY).text(seg.text, { continued: !isVeryLast, lineGap: 2 });
+              }
+            });
+            if (hasOther) {
+              doc.fillColor(BODY).text(` (${otherValue.trim()})`, { lineGap: 2 });
+            }
           }
           doc.moveDown(0.4);
           resetX();

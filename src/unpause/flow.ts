@@ -1,20 +1,15 @@
 import { SECTIONS } from "./content.js";
 import type { QuestionSpec, SectionSpec } from "./types.js";
 
-export interface DividerSlide {
-  kind: "divider";
-  section: SectionSpec;
-  sectionIndex: number;
-}
-
 export interface QuestionSlide {
   kind: "question";
   section: SectionSpec;
   sectionIndex: number;
   question: QuestionSpec;
+  isFirstInSection: boolean;
 }
 
-export type Slide = DividerSlide | QuestionSlide;
+export type Slide = QuestionSlide;
 
 export function getActiveSections(answers: Record<string, unknown>): SectionSpec[] {
   return SECTIONS.filter((section) => !section.condition || section.condition(answers)).map((section) => ({
@@ -24,17 +19,17 @@ export function getActiveSections(answers: Record<string, unknown>): SectionSpec
 }
 
 export function buildSlides(sections: SectionSpec[]): Slide[] {
-  return sections.flatMap((section, sectionIndex) => [
-    { kind: "divider", section, sectionIndex } satisfies DividerSlide,
-    ...section.questions.map(
-      (question): QuestionSlide => ({
+  return sections.flatMap((section, sectionIndex) =>
+    section.questions.map(
+      (question, questionIndex): QuestionSlide => ({
         kind: "question",
         section,
         sectionIndex,
         question,
+        isFirstInSection: questionIndex === 0,
       }),
     ),
-  ]);
+  );
 }
 
 export function getQuestionOrdinals(slides: Slide[]): number[] {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { SECTIONS } from "./content";
 import type { QuestionPart, QuestionSpec } from "./types";
-import { formatValue } from "./formatAnswer";
+import { formatValue, formatValueSegments } from "./formatAnswer";
 
 interface Submission {
   id: string;
@@ -32,7 +32,21 @@ function SubmissionTranscript({ submission }: { submission: Submission }) {
                     return (
                       <p key={key} className="text-sm text-neutral-600">
                         {qp.label && <span className="text-neutral-400">{qp.label}: </span>}
-                        {formatValue(value)}
+                        {formatValueSegments(value).map((seg, i) =>
+                          seg.href ? (
+                            <a
+                              key={i}
+                              href={seg.href}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 underline hover:text-blue-800"
+                            >
+                              {seg.text}
+                            </a>
+                          ) : (
+                            <span key={i}>{seg.text}</span>
+                          ),
+                        )}
                         {otherValue ? ` (${otherValue})` : ""}
                       </p>
                     );
