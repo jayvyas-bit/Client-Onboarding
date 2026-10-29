@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import { SECTIONS } from "../../src/unpause/content.js";
+import { getActiveSections } from "../../src/unpause/flow.js";
 import { formatValue } from "../../src/unpause/formatAnswer.js";
 
 interface SubmissionForPdf {
@@ -92,27 +93,33 @@ export function buildSubmissionPdf(submission: SubmissionForPdf): Promise<Buffer
 
     const contentWidth = doc.page.width - PAGE_MARGIN * 2;
 
-    const sectionsToRender = SECTIONS.map((section, idx) => {
-      if (section.condition && !section.condition(submission.answers)) {
-        return { section, idx, renderableQuestions: [] as Array<{ question: (typeof section.questions)[number]; parts: (typeof section.questions)[number]["parts"] }> };
-      }
-      const renderableQuestions = section.questions
-        .map((question) => {
-          const parts = question.parts.filter((qp) => {
-            const value = submission.answers[`${question.id}.${qp.id}`];
-            const otherValue = submission.answers[`${question.id}.${qp.id}__other`];
-            return !isEmptyValue(value) || (typeof otherValue === "string" && otherValue.trim());
-          });
-          return { question, parts };
-        })
-        .filter((q) => q.parts.length > 0);
-      return { section, idx, renderableQuestions };
-    }).filter((s) => s.renderableQuestions.length > 0);
+    const sectionsToRender = getActiveSections(submission.answers)
+      .map((section) => {
+        const idx = SECTIONS.findIndex((s) => s.id === section.id);
+        const renderableQuestions = section.questions
+          .map((question) => {
+            const parts = question.parts.filter((qp) => {
+              const value = submission.answers[`${question.id}.${qp.id}`];
+              const otherValue = submission.answers[`${question.id}.${qp.id}__other`];
+              return !isEmptyValue(value) || (typeof otherValue === "string" && otherValue.trim());
+            });
+            return { question, parts };
+          })
+          .filter((q) => q.parts.length > 0);
+        return { section, idx, renderableQuestions };
+      })
+      .filter((s) => s.renderableQuestions.length > 0);
+
+    let currentPageNumber = 1;
+    function addPage() {
+      doc.addPage();
+      currentPageNumber++;
+    }
 
     function ensureSpace(needed: number) {
       const bottom = doc.page.height - PAGE_MARGIN;
       if (doc.y + needed > bottom) {
-        doc.addPage();
+        addPage();
       }
     }
 
@@ -152,6 +159,18 @@ export function buildSubmissionPdf(submission: SubmissionForPdf): Promise<Buffer
           .text(`${titleCaseKey(key).toUpperCase()}  `, PAGE_MARGIN, doc.y, { continued: true, width: contentWidth });
         doc.font("Helvetica").fontSize(10).fillColor(INK).text(formatLeaf(value));
       }
+    }
+
+    function renderScalePairs(pairs: Array<[string, string]>, value: Record<number, number>) {
+      pairs.forEach((pair, i) => {
+        if (value[i] === undefined) return;
+        doc
+          .font("Helvetica")
+          .fontSize(9)
+          .fillColor(MUTED)
+          .text(`${pair[0]} <-> ${pair[1]}:  `, PAGE_MARGIN, doc.y, { continued: true, width: contentWidth });
+        doc.font("Helvetica-Bold").fontSize(10).fillColor(INK).text(String(value[i]));
+      });
     }
 
     // ---------- COVER PAGE ----------
@@ -243,27 +262,39 @@ export function buildSubmissionPdf(submission: SubmissionForPdf): Promise<Buffer
     resetX();
 
     const contentsRowHeight = 22;
+    const tocPageNumWidth = 28;
+    const tocRows: Array<{ y: number }> = [];
     if (submission.analysis) {
-      doc.circle(PAGE_MARGIN + 3, doc.y + 5, 3).fill(BRAND);
-      doc.font("Helvetica").fontSize(11).fillColor(INK).text("AI Snapshot — for the team", PAGE_MARGIN + 14, doc.y - 1);
-      doc.y += contentsRowHeight - 11;
-      resetX();
-    }
-    sectionsToRender.forEach(({ section, idx }) => {
-      const color = SECTION_ACCENTS[idx % SECTION_ACCENTS.length];
-      doc.circle(PAGE_MARGIN + 3, doc.y + 5, 3).fill(color);
+      const rowY = doc.y;
+      doc.circle(PAGE_MARGIN + 3, rowY + 5, 3).fill(BRAND);
       doc
         .font("Helvetica")
         .fontSize(11)
         .fillColor(INK)
-        .text(`${section.number} — ${section.title}`, PAGE_MARGIN + 14, doc.y - 1);
-      doc.y += contentsRowHeight - 11;
+        .text("AI Snapshot — for the team", PAGE_MARGIN + 14, rowY - 1, { width: contentWidth - 14 - tocPageNumWidth });
+      tocRows.push({ y: rowY - 1 });
+      doc.y = rowY + (contentsRowHeight - 11);
+      resetX();
+    }
+    sectionsToRender.forEach(({ section, idx }) => {
+      const color = SECTION_ACCENTS[idx % SECTION_ACCENTS.length];
+      const rowY = doc.y;
+      doc.circle(PAGE_MARGIN + 3, rowY + 5, 3).fill(color);
+      doc
+        .font("Helvetica")
+        .fontSize(11)
+        .fillColor(INK)
+        .text(`${section.number} — ${section.title}`, PAGE_MARGIN + 14, rowY - 1, { width: contentWidth - 14 - tocPageNumWidth });
+      tocRows.push({ y: rowY - 1 });
+      doc.y = rowY + (contentsRowHeight - 11);
       resetX();
     });
 
     // ---------- AI SNAPSHOT ----------
+    let aiSnapshotPageNumber: number | null = null;
     if (submission.analysis) {
-      doc.addPage();
+      addPage();
+      aiSnapshotPageNumber = currentPageNumber;
       renderAccentHeader("AI Snapshot — for the team", BRAND, 15);
       doc.moveDown(0.3);
 
@@ -283,8 +314,16 @@ export function buildSubmissionPdf(submission: SubmissionForPdf): Promise<Buffer
     }
 
     // ---------- FORM SECTIONS ----------
-    sectionsToRender.forEach(({ section, idx: sectionIdx, renderableQuestions }) => {
-      doc.addPage();
+    const sectionPageNumbers: number[] = [];
+    sectionsToRender.forEach(({ section, idx: sectionIdx, renderableQuestions }, i) => {
+      if (i === 0) {
+        addPage();
+      } else {
+        ensureSpace(90);
+        doc.moveDown(0.8);
+        resetX();
+      }
+      sectionPageNumbers.push(currentPageNumber);
       const color = SECTION_ACCENTS[sectionIdx % SECTION_ACCENTS.length];
       renderAccentHeader(`${section.number} — ${section.title}`, color, 15);
       doc.moveDown(0.4);
@@ -305,7 +344,9 @@ export function buildSubmissionPdf(submission: SubmissionForPdf): Promise<Buffer
             doc.moveDown(0.1);
           }
 
-          if (value && typeof value === "object" && !Array.isArray(value) && !isUploadOrText(value as Record<string, unknown>)) {
+          if (qp.part.kind === "scale-pairs" && value && typeof value === "object") {
+            renderScalePairs(qp.part.pairs, value as Record<number, number>);
+          } else if (value && typeof value === "object" && !Array.isArray(value) && !isUploadOrText(value as Record<string, unknown>)) {
             renderFieldsObject(value as Record<string, unknown>);
           } else {
             let text = formatValue(value);
@@ -322,6 +363,32 @@ export function buildSubmissionPdf(submission: SubmissionForPdf): Promise<Buffer
       });
 
       doc.moveDown(0.5);
+    });
+
+    // ---------- TOC PAGE NUMBERS (back-fill on cover) ----------
+    doc.switchToPage(0);
+    let tocRowIdx = 0;
+    if (aiSnapshotPageNumber !== null) {
+      doc
+        .font("Helvetica")
+        .fontSize(10)
+        .fillColor(MUTED)
+        .text(String(aiSnapshotPageNumber), doc.page.width - PAGE_MARGIN - tocPageNumWidth, tocRows[tocRowIdx].y, {
+          width: tocPageNumWidth,
+          align: "right",
+        });
+      tocRowIdx++;
+    }
+    sectionPageNumbers.forEach((pageNum) => {
+      doc
+        .font("Helvetica")
+        .fontSize(10)
+        .fillColor(MUTED)
+        .text(String(pageNum), doc.page.width - PAGE_MARGIN - tocPageNumWidth, tocRows[tocRowIdx].y, {
+          width: tocPageNumWidth,
+          align: "right",
+        });
+      tocRowIdx++;
     });
 
     // ---------- FOOTER (page numbers) ----------

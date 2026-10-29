@@ -17,7 +17,10 @@ export interface QuestionSlide {
 export type Slide = DividerSlide | QuestionSlide;
 
 export function getActiveSections(answers: Record<string, unknown>): SectionSpec[] {
-  return SECTIONS.filter((section) => !section.condition || section.condition(answers));
+  return SECTIONS.filter((section) => !section.condition || section.condition(answers)).map((section) => ({
+    ...section,
+    questions: section.questions.filter((question) => !question.condition || question.condition(answers)),
+  }));
 }
 
 export function buildSlides(sections: SectionSpec[]): Slide[] {

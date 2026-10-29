@@ -33,6 +33,8 @@ export interface QuestionSpec {
   prompt: string;
   helper?: string;
   parts: QuestionPart[];
+  /** Question is included only when this returns true for the answers so far. Omit to always include. */
+  condition?: (answers: Record<string, unknown>) => boolean;
 }
 
 export interface SectionSpec {
