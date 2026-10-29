@@ -7,7 +7,7 @@ import { buildSlides, getActiveSections, getQuestionOrdinals, getTotalQuestions 
 import type { Slide } from "./flow";
 import MicButton from "./MicButton";
 import { UnpauseMark } from "./icons";
-import type { AnswerPart, FieldSpec, UploadOrTextValue } from "./types";
+import type { AnswerPart, FieldSpec, QuestionPart, UploadOrTextValue } from "./types";
 
 type AnswerStore = Record<string, unknown>;
 
@@ -21,7 +21,7 @@ type Step =
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 const UNDERLINE_INPUT =
-  "w-full border-b-2 border-neutral-300 bg-transparent px-0.5 pb-2.5 pt-1 text-lg text-neutral-900 outline-none transition-colors placeholder:text-neutral-400 placeholder:italic focus:border-neutral-900";
+  "w-full border-b-2 border-neutral-300 bg-transparent px-0.5 pb-1 pt-0.5 text-lg text-neutral-900 outline-none transition-colors placeholder:text-neutral-400 placeholder:italic focus:border-neutral-900";
 
 const EYEBROW_LABEL = "text-xs font-medium tracking-[0.2em] text-neutral-400";
 
@@ -52,18 +52,6 @@ const SECTION_ACCENTS = [
   "#9c6b1f", // 06 Making it real.
   "#a13b5c", // 07 One last thing.
 ];
-
-function wordCount(text: string): number {
-  const trimmed = text.trim();
-  return trimmed ? trimmed.split(/\s+/).length : 0;
-}
-
-function reactiveNote(words: number): string | null {
-  if (words === 0) return null;
-  if (words < 5) return "Good start.";
-  if (words < 40) return "Keep going, if there's more.";
-  return "This is exactly the kind of detail that helps.";
-}
 
 const DRAFT_KEY = "unpause-intake-draft-v1";
 
@@ -100,26 +88,23 @@ function isFieldValid(field: FieldSpec, raw: string): boolean {
   return true;
 }
 
+function isPartIncomplete(part: QuestionPart, key: string, answers: AnswerStore): boolean {
+  if (part.part.kind === "fields") {
+    const value = (answers[key] as Record<string, string>) ?? {};
+    return !part.part.fields.every((field) => isFieldValid(field, value[field.id] ?? ""));
+  }
+  if (part.part.kind === "scale-pairs") return false;
+  if (part.optional) return false;
+  const otherValue = (answers[`${key}__other`] as string) ?? "";
+  return formatAnswerValue(part.part, answers[key], otherValue) === null;
+}
+
 function slideIncompleteReason(slide: Slide | null, answers: AnswerStore): string | null {
   if (!slide || slide.kind !== "question") return null;
   for (const part of slide.question.parts) {
     const key = keyFor(slide.question.id, part.id);
-    if (part.part.kind === "fields") {
-      const value = (answers[key] as Record<string, string>) ?? {};
-      const allValid = part.part.fields.every((field) => isFieldValid(field, value[field.id] ?? ""));
-      if (!allValid) return "Name and email are required";
-      continue;
-    }
-    if (part.part.kind === "scale-pairs") {
-      const value = (answers[key] as Record<number, number>) ?? {};
-      const allTouched = part.part.pairs.every((_, i) => value[i] !== undefined);
-      if (!allTouched) return "Move every slider to continue";
-      continue;
-    }
-    if (part.optional) continue;
-    const otherValue = (answers[`${key}__other`] as string) ?? "";
-    if (formatAnswerValue(part.part, answers[key], otherValue) === null) {
-      return "An answer is needed to continue";
+    if (isPartIncomplete(part, key, answers)) {
+      return part.part.kind === "fields" ? "Name and email are required" : "An answer is needed to continue";
     }
   }
   return null;
@@ -192,18 +177,22 @@ function FieldsInput({
   fields,
   value,
   onChange,
+  showErrors,
 }: {
   fields: FieldSpec[];
   value: Record<string, string>;
   onChange: (next: Record<string, string>) => void;
+  showErrors?: boolean;
 }) {
   return (
     <div className="grid gap-5 sm:grid-cols-2">
       {fields.map((field) => {
         const raw = value?.[field.id] ?? "";
-        const invalid = field.required && raw.trim().length > 0 && !isFieldValid(field, raw);
+        const badFormat = raw.trim().length > 0 && !isFieldValid(field, raw);
+        const missing = Boolean(showErrors) && field.required && !raw.trim();
+        const invalid = badFormat || missing;
         return (
-          <label key={field.id} className="flex flex-col gap-1.5 text-sm">
+          <label key={field.id} className="flex flex-col gap-1 text-sm">
             <span className="text-neutral-500">
               {field.label}
               {field.required && (
@@ -215,14 +204,15 @@ function FieldsInput({
             </span>
             <input
               type={field.type === "email" ? "email" : "text"}
-              className={UNDERLINE_INPUT + " text-base"}
+              className={UNDERLINE_INPUT + " text-base" + (invalid ? " border-red-400 focus:border-red-500" : "")}
               placeholder={field.placeholder}
               value={raw}
               aria-required={field.required || undefined}
               aria-invalid={invalid || undefined}
               onChange={(e) => onChange({ ...value, [field.id]: e.target.value })}
             />
-            {invalid && <span className="text-xs text-red-600">Enter a valid email address.</span>}
+            {badFormat && <span className="text-xs text-red-600">Enter a valid email address.</span>}
+            {missing && !badFormat && <span className="text-xs text-red-600">This field is required.</span>}
           </label>
         );
       })}
@@ -275,9 +265,6 @@ function LongTextInput({
   placeholder?: string;
   labelledBy?: string;
 }) {
-  const shouldReduceMotion = useReducedMotion();
-  const note = reactiveNote(wordCount(value ?? ""));
-  const hintText = note ?? "Or tap to speak your answer";
   return (
     <div className="flex flex-col gap-3">
       <textarea
@@ -288,25 +275,7 @@ function LongTextInput({
         aria-labelledby={labelledBy}
         onChange={(e) => onChange(e.target.value)}
       />
-      <div className="flex items-center gap-2.5">
-        <MicButton value={value ?? ""} onChange={onChange} />
-        {shouldReduceMotion ? (
-          <span className="text-xs text-neutral-400">{hintText}</span>
-        ) : (
-          <AnimatePresence mode="wait">
-            <motion.span
-              key={hintText}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.25, ease: EASE }}
-              className="text-xs text-neutral-400"
-            >
-              {hintText}
-            </motion.span>
-          </AnimatePresence>
-        )}
-      </div>
+      <MicButton value={value ?? ""} onChange={onChange} />
     </div>
   );
 }
@@ -602,6 +571,14 @@ const SCALE_MIN = 1;
 const SCALE_MAX = SCALE_STEPS;
 const SCALE_DEFAULT = 3;
 
+const SCALE_POINT_NAMES = ["Strongly", "Somewhat", "Balanced", "Somewhat", "Strongly"];
+
+function scalePointLabel(v: number, pair: [string, string]) {
+  const name = SCALE_POINT_NAMES[v - SCALE_MIN];
+  if (v === SCALE_DEFAULT) return "Balanced";
+  return `${name} ${v < SCALE_DEFAULT ? pair[0] : pair[1]}`;
+}
+
 function ScalePairsInput({
   pairs,
   value,
@@ -621,7 +598,7 @@ function ScalePairsInput({
               <span>{pair[0]}</span>
               <span>{pair[1]}</span>
             </div>
-            <div className="relative">
+            <div className="relative flex items-center">
               <input
                 type="range"
                 min={SCALE_MIN}
@@ -631,17 +608,27 @@ function ScalePairsInput({
                 aria-label={`${pair[0]} to ${pair[1]}`}
                 aria-valuetext={`${v} of ${SCALE_STEPS}, closer to ${v >= SCALE_DEFAULT ? pair[1] : pair[0]}`}
                 onChange={(e) => onChange({ ...value, [index]: Number(e.target.value) })}
-                className="relative h-1.5 w-full cursor-pointer appearance-none rounded-full bg-neutral-200 accent-neutral-900"
+                className="relative h-1.5 w-full cursor-pointer appearance-none rounded-full bg-neutral-200 [&::-moz-range-thumb]:h-0 [&::-moz-range-thumb]:w-0 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:opacity-0 [&::-webkit-slider-thumb]:h-0 [&::-webkit-slider-thumb]:w-0 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:opacity-0"
               />
               <div className="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-between">
-                {Array.from({ length: SCALE_STEPS }, (_, i) => (
-                  <span
-                    key={i}
-                    className={`h-1.5 w-1.5 rounded-full ${i <= v - SCALE_MIN ? "bg-neutral-900" : "bg-neutral-300"}`}
-                  />
-                ))}
+                {Array.from({ length: SCALE_STEPS }, (_, i) => {
+                  const isCurrent = i === v - SCALE_MIN;
+                  return (
+                    <span
+                      key={i}
+                      className={`rounded-full transition-all ${
+                        isCurrent
+                          ? "h-3 w-3 bg-neutral-900"
+                          : i < v - SCALE_MIN
+                            ? "h-1.5 w-1.5 bg-neutral-900"
+                            : "h-1.5 w-1.5 bg-neutral-300"
+                      }`}
+                    />
+                  );
+                })}
               </div>
             </div>
+            <div className="text-center text-xs text-neutral-500">{scalePointLabel(v, pair)}</div>
           </div>
         );
       })}
@@ -764,6 +751,7 @@ function PartRenderer({
   onOtherChange,
   onAdvance,
   headingId,
+  showErrors,
 }: {
   part: AnswerPart;
   value: unknown;
@@ -772,6 +760,7 @@ function PartRenderer({
   onOtherChange: (next: string) => void;
   onAdvance?: () => void;
   headingId: string;
+  showErrors?: boolean;
 }) {
   switch (part.kind) {
     case "fields":
@@ -780,6 +769,7 @@ function PartRenderer({
           fields={part.fields}
           value={(value as Record<string, string>) ?? {}}
           onChange={onChange}
+          showErrors={showErrors}
         />
       );
     case "short-text":
@@ -862,6 +852,7 @@ export default function UnpauseIntakeForm() {
   const [direction, setDirection] = useState(1);
   const [answers, setAnswers] = useState<AnswerStore>(() => initialDraftRef.current?.answers ?? {});
   const [confirmingReset, setConfirmingReset] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
   const activeSections = useMemo(() => getActiveSections(answers), [answers]);
   const slides = useMemo(() => buildSlides(activeSections), [activeSections]);
   const questionOrdinals = useMemo(() => getQuestionOrdinals(slides), [slides]);
@@ -871,6 +862,7 @@ export default function UnpauseIntakeForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const slideRef = useRef<HTMLDivElement>(null);
   const cardContentRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [cardHeight, setCardHeight] = useState<number | null>(null);
   const shouldReduceMotion = useReducedMotion();
   const continueControls = useAnimationControls();
@@ -884,6 +876,11 @@ export default function UnpauseIntakeForm() {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    scrollContainerRef.current?.scrollTo({ top: 0 });
+    setShowErrors(false);
+  }, [step]);
 
   useEffect(() => {
     if (step.kind === "resume") return;
@@ -954,6 +951,20 @@ export default function UnpauseIntakeForm() {
     } else {
       transitionTo({ kind: "slide", index });
     }
+  }
+
+  function attemptAdvance(index: number) {
+    if (!canAdvance) {
+      setShowErrors(true);
+      if (!shouldReduceMotion) {
+        continueControls.start({
+          x: [0, -8, 8, -6, 6, -3, 3, 0],
+          transition: { duration: 0.4, ease: [0.36, 0.07, 0.19, 0.97] },
+        });
+      }
+      return;
+    }
+    goTo(index);
   }
 
   async function handleSubmit() {
@@ -1059,19 +1070,6 @@ export default function UnpauseIntakeForm() {
 
   return (
     <div className="relative h-dvh overflow-hidden bg-[#faf8f5]">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <motion.div
-          className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-neutral-900/[0.04] blur-3xl"
-          animate={shouldReduceMotion ? undefined : { x: [0, 30, 0], y: [0, 20, 0] }}
-          transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute -bottom-40 -right-24 h-[28rem] w-[28rem] rounded-full bg-neutral-900/[0.03] blur-3xl"
-          animate={shouldReduceMotion ? undefined : { x: [0, -20, 0], y: [0, -30, 0] }}
-          transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </div>
-
       {(step.kind === "slide" || step.kind === "review") && (
         <div className="fixed inset-x-0 top-0 z-20 h-[3px] bg-neutral-900/10">
           <motion.div
@@ -1087,10 +1085,10 @@ export default function UnpauseIntakeForm() {
         <div aria-live="polite" className="sr-only">
           {liveAnnouncement}
         </div>
-        <div className="relative shrink-0 pt-6 text-center sm:pt-8">
-          <img src={unpauseLogo} alt="Unpause" className="mx-auto h-5 w-auto" />
+        <div className="relative z-10 flex shrink-0 items-center justify-between px-6 pt-6 sm:px-10 sm:pt-8 lg:pl-20 lg:pr-10">
+          <img src={unpauseLogo} alt="Unpause" className="h-5 w-auto" />
           {step.kind !== "intro" && step.kind !== "resume" && (
-            <div className="absolute right-6 top-5 sm:right-10 sm:top-7">
+            <div className="relative">
               {confirmingReset && (
                 <button
                   type="button"
@@ -1137,15 +1135,18 @@ export default function UnpauseIntakeForm() {
             </div>
           )}
         </div>
-        <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-10 sm:px-10 sm:py-14">
-          <div className="my-auto flex w-full flex-col items-center gap-6">
+        <div
+          ref={scrollContainerRef}
+          className="flex min-h-0 flex-1 flex-col items-start overflow-y-auto px-6 py-10 sm:px-10 sm:py-14 lg:pl-20 lg:pr-10"
+        >
+          <div className="my-auto flex w-full flex-col items-start gap-6">
           <motion.div
             animate={cardHeight !== null ? { height: cardHeight } : undefined}
             transition={{ duration: shouldReduceMotion ? 0 : 0.35, ease: EASE }}
             style={{ overflow: "hidden" }}
-            className="w-full max-w-4xl shrink-0 rounded-3xl border border-neutral-900/5 bg-[#fffefb] shadow-[0_8px_40px_rgba(0,0,0,0.06)]"
+            className="w-full max-w-4xl shrink-0"
           >
-            <div ref={cardContentRef} className="p-8 sm:p-12">
+            <div ref={cardContentRef} className="py-2 sm:py-4">
             <AnimatePresence mode="wait" custom={direction} initial={false}>
               <motion.div
                 key={stepKey}
@@ -1315,6 +1316,7 @@ export default function UnpauseIntakeForm() {
                             const otherKey = `${key}__other`;
                             const isLast = i === question.parts.length - 1;
                             const partHeadingId = i === 0 ? mainHeadingId : `heading-${key}`;
+                            const partInvalid = showErrors && isPartIncomplete(part, key, answers);
                             return (
                               <motion.div
                                 key={part.id}
@@ -1341,9 +1343,13 @@ export default function UnpauseIntakeForm() {
                                   otherValue={(answers[otherKey] as string) ?? ""}
                                   onChange={(v) => setAnswer(key, v)}
                                   onOtherChange={(v) => setAnswer(otherKey, v)}
-                                  onAdvance={isLast ? () => canAdvance && goTo(step.index + 1) : undefined}
+                                  onAdvance={isLast ? () => attemptAdvance(step.index + 1) : undefined}
                                   headingId={partHeadingId}
+                                  showErrors={showErrors}
                                 />
+                                {partInvalid && part.part.kind !== "fields" && (
+                                  <p className="text-sm text-red-600">An answer is needed here.</p>
+                                )}
                               </motion.div>
                             );
                           })}
@@ -1443,12 +1449,12 @@ export default function UnpauseIntakeForm() {
                 )}
 
                 {step.kind === "done" && (
-                  <div className="flex flex-col gap-8 py-10 text-center">
+                  <div className="flex flex-col gap-8 py-10">
                     <motion.svg
                       width="64"
                       height="64"
                       viewBox="0 0 64 64"
-                      className="mx-auto text-[#004ac7]"
+                      className="text-[#004ac7]"
                     >
                       <motion.circle
                         cx="32"
@@ -1484,12 +1490,18 @@ export default function UnpauseIntakeForm() {
                         {THANK_YOU.title}
                       </motion.h2>
                     </div>
-                    <div className="mx-auto flex max-w-md flex-col gap-4">
-                      {THANK_YOU.body.map((p, i) => (
+                    <motion.p
+                      variants={textItemVariants}
+                      className="max-w-md text-lg text-neutral-800 leading-relaxed"
+                    >
+                      {THANK_YOU.body[0]}
+                    </motion.p>
+                    <div className="flex max-w-md flex-col gap-2">
+                      {THANK_YOU.body.slice(1).map((p) => (
                         <motion.p
                           key={p}
                           variants={textItemVariants}
-                          className={i === 0 ? "text-lg text-neutral-800 leading-relaxed" : "text-neutral-600 leading-relaxed"}
+                          className="text-sm text-neutral-400 leading-relaxed"
                         >
                           {p}
                         </motion.p>
@@ -1499,11 +1511,11 @@ export default function UnpauseIntakeForm() {
                       <motion.p variants={textItemVariants} className="font-medium text-[#004ac7]">
                         {THANK_YOU.cta}
                       </motion.p>
-                      <motion.p variants={textItemVariants} className="text-sm text-neutral-500">
+                      <motion.p variants={textItemVariants} className="text-sm text-neutral-400">
                         {THANK_YOU.signoff}
                       </motion.p>
                     </div>
-                    <motion.p variants={textItemVariants} className="text-sm tracking-wide text-neutral-400">
+                    <motion.p variants={textItemVariants} className="text-xs tracking-wide text-neutral-300">
                       — Unpause
                     </motion.p>
                   </div>
@@ -1524,10 +1536,10 @@ export default function UnpauseIntakeForm() {
                 ← Back
               </button>
               <div className="flex items-center gap-3">
-                {step.kind === "slide" && incompleteReason && (
-                  <span className="hidden text-xs text-neutral-400 sm:inline">{incompleteReason}</span>
+                {step.kind === "slide" && showErrors && incompleteReason && (
+                  <span className="text-xs text-red-600">{incompleteReason}</span>
                 )}
-                {step.kind === "slide" && canAdvance && showEnterHint && (
+                {step.kind === "slide" && (!showErrors || canAdvance) && showEnterHint && (
                   <span className="hidden text-xs text-neutral-400 sm:inline">press Enter ↵</span>
                 )}
                 <motion.button
@@ -1535,30 +1547,18 @@ export default function UnpauseIntakeForm() {
                   disabled={step.kind === "review" && (submitting || submitSucceeded)}
                   animate={continueControls}
                   whileHover={
-                    (step.kind === "review" && (submitting || submitSucceeded)) ||
-                    (step.kind === "slide" && !canAdvance)
+                    step.kind === "review" && (submitting || submitSucceeded)
                       ? undefined
                       : { y: -2, boxShadow: "0 12px 30px rgba(0,0,0,0.14)" }
                   }
                   whileTap={step.kind === "review" && (submitting || submitSucceeded) ? undefined : { scale: 0.97 }}
                   transition={{ type: "spring", stiffness: 400, damping: 26 }}
-                  className={`flex items-center gap-2 rounded-full bg-[#01213B] px-8 py-3 text-sm font-medium text-white disabled:cursor-not-allowed ${
-                    step.kind === "slide" && !canAdvance ? "cursor-not-allowed opacity-40" : ""
-                  } disabled:opacity-40`}
+                  className="flex items-center gap-2 rounded-full bg-[#01213B] px-8 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={() => {
-                    if (step.kind === "slide" && !canAdvance) {
-                      if (!shouldReduceMotion) {
-                        continueControls.start({
-                          x: [0, -8, 8, -6, 6, -3, 3, 0],
-                          transition: { duration: 0.4, ease: [0.36, 0.07, 0.19, 0.97] },
-                        });
-                      }
-                      return;
-                    }
                     if (step.kind === "review") {
                       handleSubmit();
                     } else {
-                      goTo(step.index + 1);
+                      attemptAdvance(step.index + 1);
                     }
                   }}
                 >

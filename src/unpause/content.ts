@@ -141,7 +141,8 @@ export const SECTIONS: SectionSpec[] = [
         id: "q6",
         number: 6,
         prompt: "What would make you say, \"Yes. That's exactly what I wanted\"?",
-        helper: "Picture this project finished, six months from now, and you're genuinely glad you did it. What's different?",
+        helper:
+          "Not why you started this (we just covered that) but how you'll know it worked. Picture the finished work in hand, six months from now: what's different, what do people say, what does it feel like to finally have it?",
         parts: [{ id: "main", part: { kind: "long-text" } }],
       },
     ],
