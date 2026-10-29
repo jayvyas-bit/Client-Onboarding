@@ -142,9 +142,9 @@ export const SECTIONS: SectionSpec[] = [
       {
         id: "q6",
         number: 6,
-        prompt: "Let's look a little further ahead.",
+        prompt: "What would make you say, \"Yes. That's exactly what I wanted\"?",
         helper:
-          "Imagine this project is finished, and six months later, you're genuinely glad you invested in it. What's different? Perhaps you feel more confident presenting your brand, customers recognize it more easily, your packaging finally feels right, or you've begun attracting a different audience. What would make you say, \"Yes. That's exactly what I wanted\"?",
+          "Let's look a little further ahead. Imagine this project is finished, and six months later, you're genuinely glad you invested in it. What's different? Perhaps you feel more confident presenting your brand, customers recognize it more easily, your packaging finally feels right, or you've begun attracting a different audience.",
         parts: [{ id: "main", part: { kind: "long-text" } }],
       },
     ],
@@ -587,9 +587,9 @@ export const SECTIONS: SectionSpec[] = [
       {
         id: "q26",
         number: 31,
-        prompt: "Let's talk investment.",
+        prompt: "What's your preferred investment range? (USD)",
         helper:
-          "Have you thought about how much you'd like to invest in this project? We ask because there are different ways to approach a creative brief. Understanding your budget helps us recommend a scope that makes sense rather than proposing work you don't need. What's your preferred investment range? (USD)",
+          "Let's talk investment. Have you thought about how much you'd like to invest in this project? We ask because there are different ways to approach a creative brief. Understanding your budget helps us recommend a scope that makes sense rather than proposing work you don't need.",
         parts: [
           {
             id: "main",
