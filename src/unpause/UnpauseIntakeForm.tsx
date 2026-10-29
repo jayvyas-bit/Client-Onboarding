@@ -116,16 +116,13 @@ function slideIncompleteReason(slide: Slide | null, answers: AnswerStore): strin
       if (!allTouched) return "Move every slider to continue";
       continue;
     }
+    if (part.optional) continue;
     const otherValue = (answers[`${key}__other`] as string) ?? "";
     if (formatAnswerValue(part.part, answers[key], otherValue) === null) {
       return "An answer is needed to continue";
     }
   }
   return null;
-}
-
-function isSlideComplete(slide: Slide | null, answers: AnswerStore): boolean {
-  return slideIncompleteReason(slide, answers) === null;
 }
 
 function formatAnswerValue(part: AnswerPart, value: unknown, otherValue: string): string | null {

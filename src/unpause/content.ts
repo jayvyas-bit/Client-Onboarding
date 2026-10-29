@@ -273,25 +273,24 @@ export const SECTIONS: SectionSpec[] = [
               placeholder: "Paste links, or describe your references here...",
             },
           },
+          {
+            id: "why",
+            label: "For each one, what exactly draws you to it?",
+            helper: "The colors? The lettering? The texture? The attitude? The way it makes you feel?",
+            part: { kind: "long-text" },
+          },
         ],
       },
       {
-        id: "q12b",
-        number: 13,
-        prompt: "For each one, what exactly draws you to it?",
-        helper: "The colors? The lettering? The texture? The attitude? The way it makes you feel?",
-        parts: [{ id: "why", part: { kind: "long-text" } }],
-      },
-      {
         id: "q13",
-        number: 14,
+        number: 13,
         prompt: "Now tell me what you absolutely don't want.",
         helper: "Any colors, styles, or trends you'd rather avoid? What you don't like is often just as useful as what you do.",
         parts: [{ id: "main", part: { kind: "long-text" } }],
       },
       {
         id: "q14",
-        number: 15,
+        number: 14,
         prompt: "What's something about your brand that would be difficult for someone else to replicate?",
         helper:
           "Think process, materials, a personal story, how you see things, or something visual — a color, shape, texture, or detail that already feels distinctive. Not a slogan, just what makes it yours.",
@@ -310,7 +309,7 @@ export const SECTIONS: SectionSpec[] = [
     questions: [
       {
         id: "q15",
-        number: 16,
+        number: 15,
         prompt: "What name should appear in your logo?",
         helper:
           "Please include the exact spelling, capitalization, and punctuation you'd like us to consider. If you haven't decided on the final wording, that's okay.",
@@ -333,7 +332,7 @@ export const SECTIONS: SectionSpec[] = [
       },
       {
         id: "q16",
-        number: 17,
+        number: 16,
         prompt: "What kind of logo are you imagining?",
         helper: "Choose anything you're drawn to. We can explore more than one direction.",
         parts: [
@@ -356,7 +355,7 @@ export const SECTIONS: SectionSpec[] = [
       },
       {
         id: "q18",
-        number: 18,
+        number: 17,
         prompt: "Should your logo tell people what you make, or should it tell them who you are?",
         helper:
           "For example, a handmade bag brand might use a bag or stitch-inspired symbol, and a software tool might choose an abstract mark with no literal tie to what it does. Both are valid, just different bets. Which direction feels more interesting to you?",
@@ -373,17 +372,16 @@ export const SECTIONS: SectionSpec[] = [
               ],
             },
           },
+          {
+            id: "why",
+            label: "Why does that direction appeal to you?",
+            part: { kind: "long-text" },
+          },
         ],
       },
       {
-        id: "q18b",
-        number: 19,
-        prompt: "Why does that direction appeal to you?",
-        parts: [{ id: "why", part: { kind: "long-text" } }],
-      },
-      {
         id: "q19",
-        number: 20,
+        number: 18,
         prompt: "Where will your logo need to live?",
         helper:
           "Think beyond Instagram. A good identity needs to work in the places your customers actually encounter it. Select all that apply.",
@@ -412,15 +410,15 @@ export const SECTIONS: SectionSpec[] = [
       },
       {
         id: "q19b",
-        number: 21,
+        number: 19,
         prompt:
           "One practical detail: will any of these have size, material, color, or printing limitations we should consider?",
-        helper: "For example, a beautifully detailed logo might not translate well to a tiny woven label.",
-        parts: [{ id: "limitations", part: { kind: "long-text" } }],
+        helper: "For example, a beautifully detailed logo might not translate well to a tiny woven label. Skip this if nothing comes to mind.",
+        parts: [{ id: "limitations", part: { kind: "long-text" }, optional: true }],
       },
       {
         id: "q20",
-        number: 22,
+        number: 20,
         prompt: "What would you like us to hand over at the end?",
         helper: "Select what you think you'll need. We'll clarify the exact deliverables together before preparing a proposal.",
         parts: [
@@ -457,7 +455,7 @@ export const SECTIONS: SectionSpec[] = [
     questions: [
       {
         id: "q22",
-        number: 23,
+        number: 21,
         prompt: "What do you already have?",
         helper: "Choose everything that applies.",
         parts: [
@@ -483,13 +481,13 @@ export const SECTIONS: SectionSpec[] = [
       },
       {
         id: "q22b",
-        number: 24,
+        number: 22,
         prompt: "Share any relevant links or files.",
         parts: [{ id: "links", part: { kind: "upload-or-text" } }],
       },
       {
         id: "q23",
-        number: 25,
+        number: 23,
         prompt: "What should we keep, change, or leave behind?",
         helper:
           "If you're updating an existing identity, what still works? If you're starting fresh, are there things about your products, business, or current aesthetic that you definitely want to preserve?",
@@ -497,7 +495,7 @@ export const SECTIONS: SectionSpec[] = [
       },
       {
         id: "q24",
-        number: 26,
+        number: 24,
         prompt: "Are there other brands you'd like us to know about?",
         helper: "Competitors, similar brands, or ones you just admire. Names, handles, or links are all fine.",
         parts: [{ id: "main", part: { kind: "long-text" } }],
@@ -514,7 +512,7 @@ export const SECTIONS: SectionSpec[] = [
     questions: [
       {
         id: "q25",
-        number: 27,
+        number: 25,
         prompt: "When would you ideally like this project completed?",
         parts: [
           {
@@ -536,7 +534,7 @@ export const SECTIONS: SectionSpec[] = [
       },
       {
         id: "q25b",
-        number: 28,
+        number: 26,
         prompt: "What's the date?",
         helper: "And is it connected to a launch, event, collection, market, or other important milestone?",
         condition: hasSpecificLaunchDate,
@@ -544,7 +542,7 @@ export const SECTIONS: SectionSpec[] = [
       },
       {
         id: "q26",
-        number: 29,
+        number: 27,
         prompt: "What's your preferred investment range? (USD)",
         helper:
           "Let's talk investment. Have you thought about how much you'd like to invest in this project? We ask because there are different ways to approach a creative brief. Understanding your budget helps us recommend a scope that makes sense rather than proposing work you don't need.",
@@ -570,7 +568,7 @@ export const SECTIONS: SectionSpec[] = [
       },
       {
         id: "q27",
-        number: 30,
+        number: 28,
         prompt: "Do you have an absolute spending ceiling?",
         helper:
           "In other words, is there a maximum amount you cannot or do not want to go beyond for this project? Your preferred investment and your maximum budget don't have to be the same. Knowing both helps us respect your boundaries.",
@@ -591,14 +589,14 @@ export const SECTIONS: SectionSpec[] = [
       },
       {
         id: "q27b",
-        number: 31,
+        number: 29,
         prompt: "What's your maximum budget?",
         condition: hasMaxBudget,
         parts: [{ id: "amount", part: { kind: "short-text", placeholder: "e.g. $2,000" } }],
       },
       {
         id: "q28",
-        number: 32,
+        number: 30,
         prompt: "If we needed to prioritize, what's most important to you?",
         helper: "Choose up to three.",
         parts: [
@@ -624,7 +622,7 @@ export const SECTIONS: SectionSpec[] = [
       },
       {
         id: "q29",
-        number: 33,
+        number: 31,
         prompt: "Who will be involved in making decisions?",
         parts: [
           {
@@ -639,7 +637,7 @@ export const SECTIONS: SectionSpec[] = [
       },
       {
         id: "q29b",
-        number: 34,
+        number: 32,
         prompt: "And how do you prefer to collaborate?",
         parts: [
           {
@@ -658,7 +656,7 @@ export const SECTIONS: SectionSpec[] = [
       },
       {
         id: "q30",
-        number: 35,
+        number: 33,
         prompt: "Are you looking for a defined design service or a longer-term creative partner?",
         parts: [
           {
@@ -686,7 +684,7 @@ export const SECTIONS: SectionSpec[] = [
     questions: [
       {
         id: "q31",
-        number: 36,
+        number: 34,
         prompt: "Is there something we haven't asked that you wish we had?",
         helper:
           "A wild idea, a concern, an important constraint, an inside story, or something you haven't quite figured out how to articulate. We're listening.",
@@ -694,7 +692,7 @@ export const SECTIONS: SectionSpec[] = [
       },
       {
         id: "q32",
-        number: 37,
+        number: 35,
         prompt: "Finish this thought, if you'd like:",
         helper: "\"If we could make just one thing possible with this project, it would be __________.\"",
         parts: [{ id: "main", part: { kind: "long-text" } }],

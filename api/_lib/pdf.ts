@@ -1,7 +1,7 @@
 import PDFDocument from "pdfkit";
 import { SECTIONS } from "../../src/unpause/content.js";
 import { getActiveSections } from "../../src/unpause/flow.js";
-import { formatValue, formatValueSegments } from "../../src/unpause/formatAnswer.js";
+import { formatValueSegments } from "../../src/unpause/formatAnswer.js";
 
 interface SubmissionForPdf {
   id: string;

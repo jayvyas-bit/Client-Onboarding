@@ -25,6 +25,8 @@ export interface QuestionPart {
   label?: string;
   helper?: string;
   part: AnswerPart;
+  /** When true, this part can be left blank and still allow advancing to the next question. */
+  optional?: boolean;
 }
 
 export interface QuestionSpec {
