@@ -63,10 +63,10 @@ export const SECTIONS: SectionSpec[] = [
               kind: "fields",
               fields: [
                 { id: "name", label: "Your name", required: true },
+                { id: "email", label: "Best email to reach you", required: true, type: "email" },
                 { id: "role", label: "Your role" },
                 { id: "brand", label: "Brand / business name" },
                 { id: "website", label: "Website or social media profile" },
-                { id: "email", label: "Best email to reach you", required: true, type: "email" },
                 { id: "location", label: "Where are you based? (City / country)" },
               ],
             },

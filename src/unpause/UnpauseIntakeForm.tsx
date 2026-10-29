@@ -1090,7 +1090,7 @@ export default function UnpauseIntakeForm() {
             </div>
           )}
         </div>
-        <div className="flex flex-1 items-start justify-center px-6 py-10 sm:px-10 sm:py-14">
+        <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6 py-10 sm:px-10 sm:py-14">
           <div className="w-full max-w-4xl rounded-3xl border border-neutral-900/5 bg-[#fffefb] p-8 shadow-[0_8px_40px_rgba(0,0,0,0.06)] sm:p-12">
             <AnimatePresence mode="wait" custom={direction} initial={false}>
               <motion.div
@@ -1242,14 +1242,19 @@ export default function UnpauseIntakeForm() {
                                 <div className="max-w-prose">
                                   <motion.p
                                     variants={textItemVariants}
-                                    className={EYEBROW_LABEL}
+                                    className="inline-block rounded-full border px-3 py-1 text-xs font-medium tracking-wide"
+                                    style={{
+                                      color: accent,
+                                      borderColor: `${accent}33`,
+                                      backgroundColor: `${accent}14`,
+                                    }}
                                   >
                                     {remainingInSection === 0 ? (
-                                      "last question in this section"
+                                      "Last question in this section"
                                     ) : (
                                       <>
-                                        <AnimatedOrdinal value={remainingInSection} />{" "}
-                                        {remainingInSection === 1 ? "question" : "questions"} left in this section
+                                        <AnimatedOrdinal value={remainingInSection} />
+                                        {` ${remainingInSection === 1 ? "question" : "questions"} left in this section`}
                                       </>
                                     )}
                                   </motion.p>
@@ -1473,127 +1478,127 @@ export default function UnpauseIntakeForm() {
               </motion.div>
             </AnimatePresence>
           </div>
-        </div>
-      </div>
 
-      {(step.kind === "slide" || step.kind === "review") && (
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-neutral-900/5 bg-[#faf8f5]/85 backdrop-blur">
-          <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4 sm:px-10">
-            <button
-              type="button"
-              className="-m-2 p-2 text-sm font-medium text-neutral-500 transition hover:text-neutral-900"
-              onClick={() => (step.kind === "slide" ? goTo(step.index - 1) : goTo(slides.length - 1))}
-            >
-              ← Back
-            </button>
-            <div className="flex items-center gap-3">
-              {step.kind === "slide" && !canAdvance && (
-                <span className="hidden text-xs text-neutral-400 sm:inline">Name and email are required</span>
-              )}
-              {step.kind === "slide" && canAdvance && showEnterHint && (
-                <span className="hidden text-xs text-neutral-400 sm:inline">press Enter ↵</span>
-              )}
-              <motion.button
+          {(step.kind === "slide" || step.kind === "review") && (
+            <div className="w-full max-w-4xl border-t border-neutral-900/10 pt-6">
+              <div className="flex items-center justify-between">
+              <button
                 type="button"
-                disabled={step.kind === "review" && (submitting || submitSucceeded)}
-                animate={continueControls}
-                whileHover={
-                  (step.kind === "review" && (submitting || submitSucceeded)) ||
-                  (step.kind === "slide" && !canAdvance)
-                    ? undefined
-                    : { y: -2, boxShadow: "0 12px 30px rgba(0,0,0,0.14)" }
-                }
-                whileTap={step.kind === "review" && (submitting || submitSucceeded) ? undefined : { scale: 0.97 }}
-                transition={{ type: "spring", stiffness: 400, damping: 26 }}
-                className={`flex items-center gap-2 rounded-full bg-[#01213B] px-8 py-3 text-sm font-medium text-white disabled:cursor-not-allowed ${
-                  step.kind === "slide" && !canAdvance ? "cursor-not-allowed opacity-40" : ""
-                } disabled:opacity-40`}
-                onClick={() => {
-                  if (step.kind === "slide" && !canAdvance) {
-                    if (!shouldReduceMotion) {
-                      continueControls.start({
-                        x: [0, -8, 8, -6, 6, -3, 3, 0],
-                        transition: { duration: 0.4, ease: [0.36, 0.07, 0.19, 0.97] },
-                      });
-                    }
-                    return;
-                  }
-                  if (step.kind === "review") {
-                    handleSubmit();
-                  } else {
-                    goTo(step.index + 1);
-                  }
-                }}
+                className="-m-2 p-2 text-sm font-medium text-neutral-500 transition hover:text-neutral-900"
+                onClick={() => (step.kind === "slide" ? goTo(step.index - 1) : goTo(slides.length - 1))}
               >
-                <AnimatePresence mode="wait" initial={false}>
-                  {step.kind === "review" && submitting && (
-                    <motion.svg
-                      key="spinner"
-                      initial={{ opacity: 0, scale: 0.6 }}
-                      animate={{ opacity: 1, scale: 1, rotate: 360 }}
-                      exit={{ opacity: 0, scale: 0.6 }}
-                      transition={{
-                        opacity: { duration: 0.15 },
-                        scale: { duration: 0.15 },
-                        rotate: shouldReduceMotion
-                          ? { duration: 0 }
-                          : { duration: 0.7, repeat: Infinity, ease: "linear" },
-                      }}
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                    >
-                      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
-                      <path
-                        d="M21 12a9 9 0 0 0-9-9"
+                ← Back
+              </button>
+              <div className="flex items-center gap-3">
+                {step.kind === "slide" && !canAdvance && (
+                  <span className="hidden text-xs text-neutral-400 sm:inline">Name and email are required</span>
+                )}
+                {step.kind === "slide" && canAdvance && showEnterHint && (
+                  <span className="hidden text-xs text-neutral-400 sm:inline">press Enter ↵</span>
+                )}
+                <motion.button
+                  type="button"
+                  disabled={step.kind === "review" && (submitting || submitSucceeded)}
+                  animate={continueControls}
+                  whileHover={
+                    (step.kind === "review" && (submitting || submitSucceeded)) ||
+                    (step.kind === "slide" && !canAdvance)
+                      ? undefined
+                      : { y: -2, boxShadow: "0 12px 30px rgba(0,0,0,0.14)" }
+                  }
+                  whileTap={step.kind === "review" && (submitting || submitSucceeded) ? undefined : { scale: 0.97 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 26 }}
+                  className={`flex items-center gap-2 rounded-full bg-[#01213B] px-8 py-3 text-sm font-medium text-white disabled:cursor-not-allowed ${
+                    step.kind === "slide" && !canAdvance ? "cursor-not-allowed opacity-40" : ""
+                  } disabled:opacity-40`}
+                  onClick={() => {
+                    if (step.kind === "slide" && !canAdvance) {
+                      if (!shouldReduceMotion) {
+                        continueControls.start({
+                          x: [0, -8, 8, -6, 6, -3, 3, 0],
+                          transition: { duration: 0.4, ease: [0.36, 0.07, 0.19, 0.97] },
+                        });
+                      }
+                      return;
+                    }
+                    if (step.kind === "review") {
+                      handleSubmit();
+                    } else {
+                      goTo(step.index + 1);
+                    }
+                  }}
+                >
+                  <AnimatePresence mode="wait" initial={false}>
+                    {step.kind === "review" && submitting && (
+                      <motion.svg
+                        key="spinner"
+                        initial={{ opacity: 0, scale: 0.6 }}
+                        animate={{ opacity: 1, scale: 1, rotate: 360 }}
+                        exit={{ opacity: 0, scale: 0.6 }}
+                        transition={{
+                          opacity: { duration: 0.15 },
+                          scale: { duration: 0.15 },
+                          rotate: shouldReduceMotion
+                            ? { duration: 0 }
+                            : { duration: 0.7, repeat: Infinity, ease: "linear" },
+                        }}
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
+                        <path
+                          d="M21 12a9 9 0 0 0-9-9"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                        />
+                      </motion.svg>
+                    )}
+                    {step.kind === "review" && submitSucceeded && (
+                      <motion.svg
+                        key="check"
+                        initial={{ opacity: 0, scale: 0.6 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.6 }}
+                        transition={{ duration: 0.2 }}
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
                         stroke="currentColor"
                         strokeWidth="3"
                         strokeLinecap="round"
-                      />
-                    </motion.svg>
-                  )}
-                  {step.kind === "review" && submitSucceeded && (
-                    <motion.svg
-                      key="check"
-                      initial={{ opacity: 0, scale: 0.6 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.6 }}
-                      transition={{ duration: 0.2 }}
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <motion.polyline
-                        points="20 6 9 17 4 12"
-                        initial={{ pathLength: 0 }}
-                        animate={{ pathLength: 1 }}
-                        transition={{ duration: 0.3, ease: EASE }}
-                      />
-                    </motion.svg>
-                  )}
-                </AnimatePresence>
-                <span>
-                  {step.kind === "review"
-                    ? submitSucceeded
-                      ? "Sent!"
-                      : submitting
-                        ? "Submitting..."
-                        : "Submit The Unbrief"
-                    : step.index === slides.length - 1
-                      ? "Review your answers"
-                      : "Continue"}
-                </span>
-              </motion.button>
+                        strokeLinejoin="round"
+                      >
+                        <motion.polyline
+                          points="20 6 9 17 4 12"
+                          initial={{ pathLength: 0 }}
+                          animate={{ pathLength: 1 }}
+                          transition={{ duration: 0.3, ease: EASE }}
+                        />
+                      </motion.svg>
+                    )}
+                  </AnimatePresence>
+                  <span>
+                    {step.kind === "review"
+                      ? submitSucceeded
+                        ? "Sent!"
+                        : submitting
+                          ? "Submitting..."
+                          : "Submit The Unbrief"
+                      : step.index === slides.length - 1
+                        ? "Review your answers"
+                        : "Continue"}
+                  </span>
+                </motion.button>
+              </div>
             </div>
           </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
