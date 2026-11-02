@@ -1085,8 +1085,10 @@ export default function UnpauseIntakeForm() {
         <div aria-live="polite" className="sr-only">
           {liveAnnouncement}
         </div>
-        <div className="relative z-10 flex shrink-0 items-center justify-between px-6 pt-6 sm:px-10 sm:pt-8 lg:pl-20 lg:pr-10">
-          <img src={unpauseLogo} alt="Unpause" className="h-5 w-auto" />
+        <div className="relative z-10 grid shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 px-6 pt-6 sm:px-10 sm:pt-8 lg:px-20">
+          <div />
+          <img src={unpauseLogo} alt="Unpause" className="h-5 w-auto justify-self-center" />
+          <div className="justify-self-end">
           {step.kind !== "intro" && step.kind !== "resume" && (
             <div className="relative">
               {confirmingReset && (
@@ -1134,17 +1136,18 @@ export default function UnpauseIntakeForm() {
               </AnimatePresence>
             </div>
           )}
+          </div>
         </div>
         <div
           ref={scrollContainerRef}
-          className="flex min-h-0 flex-1 flex-col items-start overflow-y-auto px-6 py-10 sm:px-10 sm:py-14 lg:pl-20 lg:pr-10"
+          className="flex min-h-0 flex-1 flex-col items-start overflow-y-auto px-6 py-10 sm:px-10 sm:py-14 lg:px-20"
         >
           <div className="my-auto flex w-full flex-col items-start gap-6">
           <motion.div
             animate={cardHeight !== null ? { height: cardHeight } : undefined}
             transition={{ duration: shouldReduceMotion ? 0 : 0.35, ease: EASE }}
             style={{ overflow: "hidden" }}
-            className="w-full max-w-4xl shrink-0"
+            className="mx-auto w-full max-w-4xl shrink-0"
           >
             <div ref={cardContentRef} className="py-2 sm:py-4">
             <AnimatePresence mode="wait" custom={direction} initial={false}>
@@ -1526,7 +1529,7 @@ export default function UnpauseIntakeForm() {
           </motion.div>
 
           {(step.kind === "slide" || step.kind === "review") && (
-            <div className="w-full max-w-4xl shrink-0 border-t border-neutral-900/10 pt-6">
+            <div className="mx-auto w-full max-w-4xl shrink-0 border-t border-neutral-900/10 pt-6">
               <div className="flex items-center justify-between">
               <button
                 type="button"
