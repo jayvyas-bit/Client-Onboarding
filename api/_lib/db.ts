@@ -1,11 +1,17 @@
 import postgres from "postgres";
 
-const connectionString = process.env.SUPABASE_DB_URL;
-if (!connectionString) {
-  throw new Error("SUPABASE_DB_URL environment variable is not set");
-}
+let sqlClient: ReturnType<typeof postgres> | null = null;
 
-export const sql = postgres(connectionString, {
-  ssl: "require",
-  prepare: false,
-});
+export function getSql() {
+  if (!sqlClient) {
+    const connectionString = process.env.SUPABASE_DB_URL;
+    if (!connectionString) {
+      throw new Error("SUPABASE_DB_URL environment variable is not set");
+    }
+    sqlClient = postgres(connectionString, {
+      ssl: "require",
+      prepare: false,
+    });
+  }
+  return sqlClient;
+}

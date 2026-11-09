@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { sql } from "../_lib/db.js";
+import { getSql } from "../_lib/db.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "GET") {
@@ -7,23 +7,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  await sql`
-    CREATE TABLE IF NOT EXISTS unpause_submissions (
-      id uuid PRIMARY KEY,
-      submitted_at timestamptz NOT NULL,
-      answers jsonb NOT NULL
-    )
-  `;
+  try {
+    const sql = getSql();
+    await sql`
+      CREATE TABLE IF NOT EXISTS unpause_submissions (
+        id uuid PRIMARY KEY,
+        submitted_at timestamptz NOT NULL,
+        answers jsonb NOT NULL
+      )
+    `;
 
-  const rows = await sql`
-    SELECT id, submitted_at, answers FROM unpause_submissions ORDER BY submitted_at DESC
-  `;
+    const rows = await sql`
+      SELECT id, submitted_at, answers FROM unpause_submissions ORDER BY submitted_at DESC
+    `;
 
-  const submissions = rows.map((row: Record<string, unknown>) => ({
-    id: row.id as string,
-    submittedAt: new Date(row.submitted_at as string | Date).toISOString(),
-    answers: row.answers,
-  }));
+    const submissions = rows.map((row: Record<string, unknown>) => ({
+      id: row.id as string,
+      submittedAt: new Date(row.submitted_at as string | Date).toISOString(),
+      answers: row.answers,
+    }));
 
-  res.status(200).json({ ok: true, submissions });
+    res.status(200).json({ ok: true, submissions });
+  } catch (err) {
+    console.error("submissions: failed to load submissions", err);
+    res.status(500).json({ ok: false, error: "load_failed" });
+  }
 }

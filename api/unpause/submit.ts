@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { waitUntil } from "@vercel/functions";
-import { sql } from "../_lib/db.js";
+import { getSql } from "../_lib/db.js";
 import { randomUUID } from "node:crypto";
 import { buildSubmissionPdf } from "../_lib/pdf.js";
 import { uploadSubmissionPdfToDrive } from "../_lib/drive.js";
@@ -8,7 +8,7 @@ import { generateSmartAnalysis } from "../_lib/analyze.js";
 
 export const config = { maxDuration: 60 };
 
-async function ensureTable() {
+async function ensureTable(sql: ReturnType<typeof getSql>) {
   await sql`
     CREATE TABLE IF NOT EXISTS unpause_submissions (
       id uuid PRIMARY KEY,
@@ -30,15 +30,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  await ensureTable();
-
   const id = randomUUID();
   const submittedAt = new Date().toISOString();
 
-  await sql`
-    INSERT INTO unpause_submissions (id, submitted_at, answers)
-    VALUES (${id}, ${submittedAt}, ${JSON.stringify(answers)}::jsonb)
-  `;
+  try {
+    const sql = getSql();
+    await ensureTable(sql);
+    await sql`
+      INSERT INTO unpause_submissions (id, submitted_at, answers)
+      VALUES (${id}, ${submittedAt}, ${JSON.stringify(answers)}::jsonb)
+    `;
+  } catch (err) {
+    console.error("submit: failed to save submission", err);
+    res.status(500).json({ ok: false, error: "save_failed" });
+    return;
+  }
 
   res.status(200).json({ ok: true, id });
 
